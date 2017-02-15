@@ -281,8 +281,8 @@ public class SliderAppsViewControllerImpl implements SliderAppsViewController {
                 newHadoopConfigs.put(PROPERTY_METRICS_SERVER_PORT, portString);
                 status.getParameters().put(PROPERTY_METRICS_SERVER_PORT, portString);
               }
-              newHadoopConfigs.put(PROPERTY_METRICS_LIBRARY_PATH, "file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar");
-              status.getParameters().put(PROPERTY_METRICS_LIBRARY_PATH, "file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar");
+              newHadoopConfigs.put(PROPERTY_METRICS_LIBRARY_PATH, "file:///opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar");
+              status.getParameters().put(PROPERTY_METRICS_LIBRARY_PATH, "file:///opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar");
             }
             Validation validateHDFSAccess = validateHDFSAccess(newHadoopConfigs, hdfsServiceInfo);
             if (validateHDFSAccess != null) {

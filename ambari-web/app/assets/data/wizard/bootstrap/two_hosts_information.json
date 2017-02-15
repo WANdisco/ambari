@@ -285,7 +285,7 @@
               {
                 "user" : "root",
                 "pid" : 2283,
-                "command" : "/bin/sh -c /usr/jdk64/jdk1.6.0_31/bin/java -server -XX:NewRatio=2 -XX:+UseConcMarkSweepGC -Xms512m -Xmx2048m -cp /etc/ambari-server/conf:/usr/lib/ambari-server/*:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin:/usr/lib/ambari-server/* org.apache.ambari.server.controller.AmbariServer >/var/log/ambari-server/ambari-server.out 2>&1",
+                "command" : "/bin/sh -c /usr/jdk64/jdk1.6.0_31/bin/java -server -XX:NewRatio=2 -XX:+UseConcMarkSweepGC -Xms512m -Xmx2048m -cp /etc/ambari-server/conf:/opt/nsn/ngdb/ambari-server/*:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin:/opt/nsn/ngdb/ambari-server/* org.apache.ambari.server.controller.AmbariServer >/var/log/ambari-server/ambari-server.out 2>&1",
                 "hadoop" : true
               }
             ],

@@ -36,7 +36,7 @@ moduleFor('controller:slider', 'App.SliderController', {
 var properties = [
   Em.Object.create({
     viewConfigName: 'site.global.metric_collector_lib',
-    value: 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar'
+    value: 'file:///opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar'
   }),
   Em.Object.create({
     viewConfigName: 'site.global.metric_collector_host',
@@ -78,7 +78,7 @@ test('getParametersFromViewPropertiesSuccessCallback', function () {
     sinon.stub(App.SliderApp.store, 'all').returns(properties);
     controller.getParametersFromViewPropertiesSuccessCallback({
       parameters: {
-        'site.global.metric_collector_lib': 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar',
+        'site.global.metric_collector_lib': 'file:///opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar',
         'site.global.metric_collector_host': 'h2',
         'site.global.metric_collector_port': '6188'
       },
@@ -89,7 +89,7 @@ test('getParametersFromViewPropertiesSuccessCallback', function () {
 
   equal(App.get('metricsHost'), 'h2', 'should set metrics server host');
   equal(App.get('metricsPort'), '6188', 'should set metrics server port');
-  equal(App.get('metricsLibPath'), 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar', 'should set metrics lib path');
+  equal(App.get('metricsLibPath'), 'file:///opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar', 'should set metrics lib path');
 
 });
 
@@ -105,7 +105,7 @@ test('getParametersFromViewPropertiesSuccessCallback', function () {
 
    equal(App.get('metricsHost'), 'h2', 'should set metrics server host');
    equal(App.get('metricsPort'), '6188', 'should set metrics server port');
-   equal(App.get('metricsLibPath'), 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar', 'should set metrics lib path');
+   equal(App.get('metricsLibPath'), 'file:///opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar', 'should set metrics lib path');
 
  });
 

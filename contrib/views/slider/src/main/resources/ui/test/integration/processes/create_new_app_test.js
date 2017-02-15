@@ -59,7 +59,7 @@ var appTypes = {
         "site.global.app_install_dir": "${AGENT_WORK_ROOT}/app/install",
         "site.global.metric_collector_host": "${NN_HOST}",
         "site.global.metric_collector_port": "6118",
-        "site.global.metric_collector_lib": "file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar",
+        "site.global.metric_collector_lib": "file:///opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar",
         "site.global.hbase_master_heapsize": "1024m",
         "site.global.hbase_regionserver_heapsize": "1024m",
         "site.global.security_enabled": "false",

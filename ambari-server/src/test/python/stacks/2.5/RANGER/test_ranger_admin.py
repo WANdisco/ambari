@@ -56,17 +56,17 @@ class TestRangerAdmin(RMFTestCase):
         mode = 0755,
         cd_access = 'a',
     )
-    self.assertResourceCalled('Directory', '/usr/lib/ambari-infra-solr-client',
+    self.assertResourceCalled('Directory', '/opt/nsn/ngdb/ambari-infra-solr-client',
         cd_access = 'a',
         create_parents = True,
         mode = 0755,
         recursive_ownership = True,
     )
-    self.assertResourceCalled('File', '/usr/lib/ambari-infra-solr-client/solrCloudCli.sh',
-        content = StaticFile('/usr/lib/ambari-infra-solr-client/solrCloudCli.sh'),
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh',
+        content = StaticFile('/opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh'),
         mode = 0755,
     )
-    self.assertResourceCalled('File', '/usr/lib/ambari-infra-solr-client/log4j.properties',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-infra-solr-client/log4j.properties',
         content = InlineTemplate(self.getConfig()['configurations']['infra-solr-client-log4j']['content']),
         mode = 0644,
     )
@@ -74,13 +74,13 @@ class TestRangerAdmin(RMFTestCase):
         content = '',
         mode = 0664,
     )
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /infra-solr --check-znode --retry 5 --interval 10')
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --download-config --config-dir /tmp/solr_config_ranger_audits_0.[0-9]* --config-set ranger_audits --retry 30 --interval 5')
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --upload-config --config-dir /usr/hdp/current/ranger-admin/contrib/solr_for_audit_setup/conf --config-set ranger_audits --retry 30 --interval 5')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /infra-solr --check-znode --retry 5 --interval 10')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --download-config --config-dir /tmp/solr_config_ranger_audits_0.[0-9]* --config-set ranger_audits --retry 30 --interval 5')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --upload-config --config-dir /usr/hdp/current/ranger-admin/contrib/solr_for_audit_setup/conf --config-set ranger_audits --retry 30 --interval 5')
     self.assertResourceCalledRegexp('^Directory$', '^/tmp/solr_config_ranger_audits_0.[0-9]*',
                                     action=['delete'],
                                     create_parents=True)
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --create-collection --collection ranger_audits --config-set ranger_audits --shards 1 --replication 1 --max-shards 1 --retry 5 --interval 10')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --create-collection --collection ranger_audits --config-set ranger_audits --shards 1 --replication 1 --max-shards 1 --retry 5 --interval 10')
 
     self.assertResourceCalled('Execute', '/usr/bin/ranger-admin-start',
       environment = {'JAVA_HOME': u'/usr/jdk64/jdk1.7.0_45'},
@@ -137,17 +137,17 @@ class TestRangerAdmin(RMFTestCase):
         mode = 0755,
         cd_access = 'a',
     )
-    self.assertResourceCalled('Directory', '/usr/lib/ambari-infra-solr-client',
+    self.assertResourceCalled('Directory', '/opt/nsn/ngdb/ambari-infra-solr-client',
         cd_access = 'a',
         create_parents = True,
         mode = 0755,
         recursive_ownership = True,
     )
-    self.assertResourceCalled('File', '/usr/lib/ambari-infra-solr-client/solrCloudCli.sh',
-        content = StaticFile('/usr/lib/ambari-infra-solr-client/solrCloudCli.sh'),
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh',
+        content = StaticFile('/opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh'),
         mode = 0755,
     )
-    self.assertResourceCalled('File', '/usr/lib/ambari-infra-solr-client/log4j.properties',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-infra-solr-client/log4j.properties',
         content = InlineTemplate(self.getConfig()['configurations']['infra-solr-client-log4j']['content']),
         mode = 0644,
     )
@@ -159,13 +159,13 @@ class TestRangerAdmin(RMFTestCase):
       content = Template('ranger_solr_jaas_conf.j2'),
       owner = 'ranger',
     )
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /ambari-solr --check-znode --retry 5 --interval 10')
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/ambari-solr --download-config --config-dir /tmp/solr_config_ranger_audits_0.[0-9]* --config-set ranger_audits --retry 30 --interval 5')
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/ambari-solr --upload-config --config-dir /usr/hdp/current/ranger-admin/contrib/solr_for_audit_setup/conf --config-set ranger_audits --retry 30 --interval 5')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /ambari-solr --check-znode --retry 5 --interval 10')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/ambari-solr --download-config --config-dir /tmp/solr_config_ranger_audits_0.[0-9]* --config-set ranger_audits --retry 30 --interval 5')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/ambari-solr --upload-config --config-dir /usr/hdp/current/ranger-admin/contrib/solr_for_audit_setup/conf --config-set ranger_audits --retry 30 --interval 5')
     self.assertResourceCalledRegexp('^Directory$', '^/tmp/solr_config_ranger_audits_0.[0-9]*',
                                     action=['delete'],
                                     create_parents=True)
-    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/ambari-solr --create-collection --collection ranger_audits --config-set ranger_audits --shards 1 --replication 1 --max-shards 1 --retry 5 --interval 10')
+    self.assertResourceCalledRegexp('^Execute$', '^ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/ambari-solr --create-collection --collection ranger_audits --config-set ranger_audits --shards 1 --replication 1 --max-shards 1 --retry 5 --interval 10')
 
     self.assertResourceCalled('Execute', '/usr/bin/ranger-admin-start',
       environment = {'JAVA_HOME': u'/usr/jdk64/jdk1.7.0_45'},
@@ -211,13 +211,13 @@ class TestRangerAdmin(RMFTestCase):
       properties = {'SQL_CONNECTOR_JAR': '/usr/hdp/current/ranger-admin/ews/lib/mysql-connector-java.jar'}
     )
 
-    self.assertResourceCalled('File', '/usr/lib/ambari-agent/DBConnectionVerification.jar',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar',
       content = DownloadSource('http://c6401.ambari.apache.org:8080/resources/DBConnectionVerification.jar'),
       mode = 0644
     )
 
     self.assertResourceCalled('Execute',
-      '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-admin/ews/lib/mysql-connector-java.jar:/usr/hdp/current/ranger-admin/ews/lib/* org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/ranger01\' rangeradmin01 rangeradmin01 com.mysql.jdbc.Driver',
+      '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-admin/ews/lib/mysql-connector-java.jar:/usr/hdp/current/ranger-admin/ews/lib/* org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/ranger01\' rangeradmin01 rangeradmin01 com.mysql.jdbc.Driver',
       path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'],
       tries=5,
       try_sleep=10,
@@ -354,13 +354,13 @@ class TestRangerAdmin(RMFTestCase):
       properties = {'SQL_CONNECTOR_JAR': '/usr/hdp/current/ranger-admin/ews/lib/mysql-connector-java.jar'}
     )
 
-    self.assertResourceCalled('File', '/usr/lib/ambari-agent/DBConnectionVerification.jar',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar',
       content = DownloadSource('http://c6401.ambari.apache.org:8080/resources/DBConnectionVerification.jar'),
       mode = 0644
     )
 
     self.assertResourceCalled('Execute',
-      '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-admin/ews/lib/mysql-connector-java.jar:/usr/hdp/current/ranger-admin/ews/lib/* org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/ranger01\' rangeradmin01 rangeradmin01 com.mysql.jdbc.Driver',
+      '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-admin/ews/lib/mysql-connector-java.jar:/usr/hdp/current/ranger-admin/ews/lib/* org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/ranger01\' rangeradmin01 rangeradmin01 com.mysql.jdbc.Driver',
       path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'],
       tries=5,
       try_sleep=10,

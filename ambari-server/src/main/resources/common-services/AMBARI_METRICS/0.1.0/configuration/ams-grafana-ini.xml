@@ -94,7 +94,7 @@ http_port = {{ams_grafana_port}}
 
 # the path relative working path
 ;static_root_path = public
-static_root_path = /usr/lib/ambari-metrics-grafana/public
+static_root_path = /opt/nsn/ngdb/ambari-metrics-grafana/public
 
 # enable gzip
 ;enable_gzip = false
@@ -302,7 +302,7 @@ org_name = Main Org.
 [dashboards.json]
 ;enabled = false
 ;path = /var/lib/grafana/dashboards
-path = /usr/lib/ambari-metrics-grafana/public/dashboards
+path = /opt/nsn/ngdb/ambari-metrics-grafana/public/dashboards
     </value>
     <on-ambari-upgrade add="true"/>
   </property>

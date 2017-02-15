@@ -206,7 +206,7 @@ if db_flavor.lower() == 'sqla':
 
 #for db connection
 check_db_connection_jar_name = "DBConnectionVerification.jar"
-check_db_connection_jar = format("/usr/lib/ambari-agent/{check_db_connection_jar_name}")
+check_db_connection_jar = format("/opt/nsn/ngdb/ambari-agent/{check_db_connection_jar_name}")
 ranger_jdbc_connection_url = config["configurations"]["ranger-admin-site"]["ranger.jpa.jdbc.url"]
 ranger_jdbc_driver = config["configurations"]["ranger-admin-site"]["ranger.jpa.jdbc.driver"]
 

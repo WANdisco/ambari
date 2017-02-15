@@ -30,10 +30,10 @@
     <custom.tests>false</custom.tests>
     <hdpUrlForCentos6>http://public-repo-1.hortonworks.com/HDP/centos6/2.x/updates/2.1.1.0</hdpUrlForCentos6>
     <hdpLatestUrl>http://public-repo-1.hortonworks.com/HDP/hdp_urlinfo.json</hdpLatestUrl>
-    <ambari_commons.install.dir>/usr/lib/ambari-server/lib/ambari_commons</ambari_commons.install.dir>
-    <resource_management.install.dir>/usr/lib/ambari-server/lib/resource_management</resource_management.install.dir>
-    <jinja.install.dir>/usr/lib/ambari-server/lib/ambari_jinja2</jinja.install.dir>
-    <simplejson.install.dir>/usr/lib/ambari-server/lib/ambari_simplejson</simplejson.install.dir>
+    <ambari_commons.install.dir>/opt/nsn/ngdb/ambari-server/lib/ambari_commons</ambari_commons.install.dir>
+    <resource_management.install.dir>/opt/nsn/ngdb/ambari-server/lib/resource_management</resource_management.install.dir>
+    <jinja.install.dir>/opt/nsn/ngdb/ambari-server/lib/ambari_jinja2</jinja.install.dir>
+    <simplejson.install.dir>/opt/nsn/ngdb/ambari-server/lib/ambari_simplejson</simplejson.install.dir>
     <ambari-web-dir>${basedir}/../ambari-web/public</ambari-web-dir>
     <ambari-admin-dir>${basedir}/../ambari-admin</ambari-admin-dir>
     <contrib-views-dir>${basedir}/../contrib/views</contrib-views-dir>
@@ -427,12 +427,12 @@
               </sources>
             </mapping>
       			<mapping>
-              <directory>/usr/lib/ambari-server</directory>
+              <directory>/opt/nsn/ngdb/ambari-server</directory>
               <username>root</username>
               <groupname>root</groupname>
               <sources>
                 <source>
-                  <location>${project.build.directory}${dirsep}${project.artifactId}-${project.version}-dist/usr/lib/ambari-server</location>
+                  <location>${project.build.directory}${dirsep}${project.artifactId}-${project.version}-dist/opt/nsn/ngdb/ambari-server</location>
                 </source>
               </sources>
             </mapping>

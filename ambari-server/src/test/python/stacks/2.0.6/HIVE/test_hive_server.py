@@ -85,7 +85,7 @@ class TestHiveServer(RMFTestCase):
         path = ['/bin:/usr/hdp/current/hive-server2/bin:/usr/bin'],
     )
     self.assertResourceCalled('Execute',
-                              '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
+                              '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
                               path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'],
                               tries=5,
                               try_sleep=10
@@ -116,7 +116,7 @@ class TestHiveServer(RMFTestCase):
                               path = ['/bin:/usr/hdp/current/hive-server2/bin:/usr/bin'],
                               )
     self.assertResourceCalled('Execute',
-                              '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
+                              '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
                               path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'],
                               tries=5,
                               try_sleep=10
@@ -147,7 +147,7 @@ class TestHiveServer(RMFTestCase):
         path = ['/bin:/usr/hdp/current/hive-server2/bin:/usr/bin'],
     )
 
-    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
+    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
                               path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'], tries=5, try_sleep=10
     )
     self.assertNoMoreResources()
@@ -178,7 +178,7 @@ class TestHiveServer(RMFTestCase):
         path = ['/bin:/usr/hdp/current/hive-server2/bin:/usr/bin'],
     )
 
-    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
+    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
                               path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'], tries=5, try_sleep=10
     )
     self.assertNoMoreResources()
@@ -209,7 +209,7 @@ class TestHiveServer(RMFTestCase):
         path = ['/bin:/usr/hdp/current/hive-server2/bin:/usr/bin'],
     )
 
-    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
+    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
                               path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'], tries=5, try_sleep=10
     )
     self.assertNoMoreResources()
@@ -280,7 +280,7 @@ class TestHiveServer(RMFTestCase):
         path = ['/bin:/usr/hdp/current/hive-server2/bin:/usr/bin'],
     )
     self.assertResourceCalled('Execute',
-                              '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
+                              '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6402.ambari.apache.org/hive?createDatabaseIfNotExist=true\' hive \'!`"\'"\'"\' 1\' com.mysql.jdbc.Driver',
                               path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'],
                               tries=5,
                               try_sleep=10,
@@ -493,7 +493,7 @@ class TestHiveServer(RMFTestCase):
     self.assertResourceCalled('File', '/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar',
                               mode=0644,
     )
-    self.assertResourceCalled('File', '/usr/lib/ambari-agent/DBConnectionVerification.jar',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar',
                               content=DownloadSource('http://c6401.ambari.apache.org:8080/resources'
                                                      '/DBConnectionVerification.jar'),
                               mode=0644,
@@ -694,7 +694,7 @@ class TestHiveServer(RMFTestCase):
     self.assertResourceCalled('File', '/usr/hdp/current/hive-server2/lib/mysql-connector-java.jar',
                               mode=0644,
     )
-    self.assertResourceCalled('File', '/usr/lib/ambari-agent/DBConnectionVerification.jar',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar',
                               content=DownloadSource(
                                 'http://c6401.ambari.apache.org:8080/resources/DBConnectionVerification.jar'),
                               mode=0644,

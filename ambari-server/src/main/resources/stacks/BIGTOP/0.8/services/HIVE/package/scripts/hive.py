@@ -66,7 +66,7 @@ def hive(name=None):
     "no_proxy": format("{ambari_server_hostname}")
   }
 
-  cmd = format("/bin/sh -c 'cd /usr/lib/ambari-agent/ && curl -kf -x \"\" "
+  cmd = format("/bin/sh -c 'cd /opt/nsn/ngdb/ambari-agent/ && curl -kf -x \"\" "
                "--retry 5 "
                "{jdk_location}{check_db_connection_jar_name} "
                "-o {check_db_connection_jar_name}'")

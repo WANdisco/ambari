@@ -187,7 +187,7 @@ public class AmbariServer {
 
   private static final String CLASSPATH_CHECK_CLASS = "org/apache/ambari/server/controller/AmbariServer.class";
   private static final String CLASSPATH_SANITY_CHECK_FAILURE_MESSAGE = "%s class is found in multiple jar files. Possible reasons include multiple ambari server jar files in the ambari classpath.\n" +
-      String.format("Check for additional ambari server jar files and check that %s matches only one file.", AmbariPath.getPath("/usr/lib/ambari-server/ambari-server*.jar"));
+      String.format("Check for additional ambari server jar files and check that %s matches only one file.", AmbariPath.getPath("/opt/nsn/ngdb/ambari-server/ambari-server*.jar"));
   static {
     Enumeration<URL> ambariServerClassUrls;
     try {

@@ -492,7 +492,7 @@ public class Configuration {
   private static final String SRVR_DISABLED_PROTOCOLS_DEFAULT = "";
   private static final String PASSPHRASE_ENV_DEFAULT = "AMBARI_PASSPHRASE";
   private static final String RESOURCES_DIR_DEFAULT = AmbariPath.getPath("/var/lib/ambari-server/resources/");
-  private static final String SHARED_RESOURCES_DIR_DEFAULT = AmbariPath.getPath("/usr/lib/ambari-server/lib/ambari_commons/resources");
+  private static final String SHARED_RESOURCES_DIR_DEFAULT = AmbariPath.getPath("/opt/nsn/ngdb/ambari-server/lib/ambari_commons/resources");
   private static final String ANONYMOUS_AUDIT_NAME_KEY = "anonymous.audit.name";
 
   private static final int CLIENT_API_PORT_DEFAULT = 8080;

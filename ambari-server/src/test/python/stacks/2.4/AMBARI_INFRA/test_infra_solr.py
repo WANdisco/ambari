@@ -55,7 +55,7 @@ class TestInfraSolr(RMFTestCase):
                                 cd_access = 'a',
                                 mode = 0755
       )
-      self.assertResourceCalled('Directory', '/usr/lib/ambari-infra-solr',
+      self.assertResourceCalled('Directory', '/opt/nsn/ngdb/ambari-infra-solr',
                                 owner = 'solr',
                                 group = 'hadoop',
                                 create_parents = True,
@@ -95,9 +95,9 @@ class TestInfraSolr(RMFTestCase):
                                 content = InlineTemplate(self.getConfig()['configurations']['infra-solr-log4j']['content'])
       )
 
-      self.assertResourceCalled('Execute', 'ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /infra-solr --create-znode --retry 5 --interval 10')
-      self.assertResourceCalled('Execute', 'ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --cluster-prop --property-name urlScheme --property-value http')
-      self.assertResourceCalled('Execute', 'ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /usr/lib/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /infra-solr --setup-kerberos-plugin')
+      self.assertResourceCalled('Execute', 'ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /infra-solr --create-znode --retry 5 --interval 10')
+      self.assertResourceCalled('Execute', 'ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181/infra-solr --cluster-prop --property-name urlScheme --property-value http')
+      self.assertResourceCalled('Execute', 'ambari-sudo.sh JAVA_HOME=/usr/jdk64/jdk1.7.0_45 /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh --zookeeper-connect-string c6401.ambari.apache.org:2181 --znode /infra-solr --setup-kerberos-plugin')
 
   def test_configure_default(self):
     self.executeScript(self.COMMON_SERVICES_PACKAGE_DIR + "/scripts/infra_solr.py",
@@ -121,7 +121,7 @@ class TestInfraSolr(RMFTestCase):
     )
     
     self.configureResourcesCalled()
-    self.assertResourceCalled('Execute', "/usr/lib/ambari-infra-solr/bin/solr start -cloud -noprompt -s /opt/ambari_infra_solr/data >> /var/log/ambari-infra-solr/solr-install.log 2>&1",
+    self.assertResourceCalled('Execute', "/opt/nsn/ngdb/ambari-infra-solr/bin/solr start -cloud -noprompt -s /opt/ambari_infra_solr/data >> /var/log/ambari-infra-solr/solr-install.log 2>&1",
                               environment = {'SOLR_INCLUDE': '/etc/ambari-infra-solr/conf/infra-solr-env.sh'},
                               user = "solr"
     )
@@ -135,7 +135,7 @@ class TestInfraSolr(RMFTestCase):
                        target = RMFTestCase.TARGET_COMMON_SERVICES
     )
     
-    self.assertResourceCalled('Execute', '/usr/lib/ambari-infra-solr/bin/solr stop -all >> /var/log/ambari-infra-solr/solr-install.log',
+    self.assertResourceCalled('Execute', '/opt/nsn/ngdb/ambari-infra-solr/bin/solr stop -all >> /var/log/ambari-infra-solr/solr-install.log',
                               environment = {'SOLR_INCLUDE': '/etc/ambari-infra-solr/conf/infra-solr-env.sh'},
                               user = "solr",
                               only_if = "test -f /var/run/ambari-infra-solr/solr-8886.pid"

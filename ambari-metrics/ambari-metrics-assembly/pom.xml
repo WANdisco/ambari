@@ -237,7 +237,7 @@
                   <mappings>
                     <mapping>
                       <!--jars-->
-                      <directory>/usr/lib/ambari-metrics-collector/</directory>
+                      <directory>/opt/nsn/ngdb/ambari-metrics-collector/</directory>
                       <sources>
                         <source>
                           <location>${collector.dir}/target/lib</location>
@@ -374,7 +374,7 @@
 
                   <mappings>
                     <mapping>
-                      <directory>/usr/lib/ambari-metrics-hadoop-sink</directory>
+                      <directory>/opt/nsn/ngdb/ambari-metrics-hadoop-sink</directory>
                       <sources>
                         <source>
                           <location>${hadoop-sink.dir}/target/ambari-metrics-hadoop-sink-with-common-${project.version}.jar</location>
@@ -406,7 +406,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/ambari-metrics-kafka-sink</directory>
+                      <directory>/opt/nsn/ngdb/ambari-metrics-kafka-sink</directory>
                       <sources>
                         <source>
                           <location>${kafka-sink.dir}/target/${kafka.sink.jar}</location>
@@ -414,7 +414,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/ambari-metrics-kafka-sink/lib</directory>
+                      <directory>/opt/nsn/ngdb/ambari-metrics-kafka-sink/lib</directory>
                       <sources>
                         <source>
                           <location>${kafka-sink.dir}/target/lib</location>
@@ -441,7 +441,7 @@
                   <mappings>
                     <mapping>
                       <!--grafana-->
-                      <directory>/usr/lib/ambari-metrics-grafana/</directory>
+                      <directory>/opt/nsn/ngdb/ambari-metrics-grafana/</directory>
                       <sources>
                         <source>
                           <location>${grafana.dir}/target/grafana/${grafana.folder}</location>
@@ -449,7 +449,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/ambari-metrics-grafana/bin</directory>
+                      <directory>/opt/nsn/ngdb/ambari-metrics-grafana/bin</directory>
                       <filemode>755</filemode>
                       <sources>
                         <source>
@@ -726,9 +726,9 @@
                     <path>/var/log/ambari-metrics-grafana</path>
                     <path>/var/lib/ambari-metrics-collector</path>
                     <path>/var/lib/ambari-metrics-grafana</path>
-                    <path>/usr/lib/ambari-metrics-hadoop-sink</path>
-                    <path>/usr/lib/ambari-metrics-kafka-sink</path>
-                    <path>/usr/lib/ambari-metrics-kafka-sink/lib</path>
+                    <path>/opt/nsn/ngdb/ambari-metrics-hadoop-sink</path>
+                    <path>/opt/nsn/ngdb/ambari-metrics-kafka-sink</path>
+                    <path>/opt/nsn/ngdb/ambari-metrics-kafka-sink/lib</path>
                     <path>/usr/lib/flume/lib</path>
                     <path>/usr/lib/storm/lib</path>
                   </paths>
@@ -769,7 +769,7 @@
                   <mapper>
                     <type>perm</type>
                     <dirmode>644</dirmode>
-                    <prefix>/usr/lib/ambari-metrics-collector</prefix>
+                    <prefix>/opt/nsn/ngdb/ambari-metrics-collector</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -779,7 +779,7 @@
                   <mapper>
                     <type>perm</type>
                     <filemode>644</filemode>
-                    <prefix>/usr/lib/ambari-metrics-collector</prefix>
+                    <prefix>/opt/nsn/ngdb/ambari-metrics-collector</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -884,7 +884,7 @@
                   <mapper>
                     <type>perm</type>
                     <filemode>644</filemode>
-                    <prefix>/usr/lib/ambari-metrics-grafana</prefix>
+                    <prefix>/opt/nsn/ngdb/ambari-metrics-grafana</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -893,7 +893,7 @@
                   <mapper>
                     <type>perm</type>
                     <filemode>755</filemode>
-                    <prefix>/usr/lib/ambari-metrics-grafana/bin</prefix>
+                    <prefix>/opt/nsn/ngdb/ambari-metrics-grafana/bin</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -933,7 +933,7 @@
                     <type>perm</type>
                     <filemode>644</filemode>
                     <dirmode>755</dirmode>
-                    <prefix>/usr/lib/ambari-metrics-hadoop-sink</prefix>
+                    <prefix>/opt/nsn/ngdb/ambari-metrics-hadoop-sink</prefix>
                   </mapper>
                 </data>
 
@@ -982,7 +982,7 @@
                     <type>perm</type>
                     <filemode>644</filemode>
                     <dirmode>755</dirmode>
-                    <prefix>/usr/lib/ambari-metrics-kafka-sink</prefix>
+                    <prefix>/opt/nsn/ngdb/ambari-metrics-kafka-sink</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -992,7 +992,7 @@
                     <type>perm</type>
                     <filemode>644</filemode>
                     <dirmode>755</dirmode>
-                    <prefix>/usr/lib/ambari-metrics-kafka-sink/lib</prefix>
+                    <prefix>/opt/nsn/ngdb/ambari-metrics-kafka-sink/lib</prefix>
                   </mapper>
                 </data>
               </dataSet>

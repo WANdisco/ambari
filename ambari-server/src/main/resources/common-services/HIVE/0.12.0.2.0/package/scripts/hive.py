@@ -277,7 +277,7 @@ def hive(name=None):
     if params.hive2_jdbc_target is not None and not os.path.exists(params.hive2_jdbc_target):
       jdbc_connector(params.hive2_jdbc_target, params.hive2_previous_jdbc_jar)
 
-  File(format("/usr/lib/ambari-agent/{check_db_connection_jar_name}"),
+  File(format("/opt/nsn/ngdb/ambari-agent/{check_db_connection_jar_name}"),
        content = DownloadSource(format("{jdk_location}{check_db_connection_jar_name}")),
        mode = 0644,
   )

@@ -53,7 +53,7 @@ class TestConfigs(TestCase):
     properties = Properties()
     get_conf_dir_mock.return_value = "/etc/ambari-server/conf"
 
-    expected_classpath = "'/etc/ambari-server/conf:/usr/lib/ambari-server/*'"
+    expected_classpath = "'/etc/ambari-server/conf:/opt/nsn/ngdb/ambari-server/*'"
     serverClassPath = ServerClassPath(properties, None)
     self.assertEquals(expected_classpath, serverClassPath.get_full_ambari_classpath_escaped_for_shell())
 
@@ -86,7 +86,7 @@ class TestConfigs(TestCase):
     get_conf_dir_mock.return_value = "/etc/ambari-server/conf"
     os.environ[SERVER_CLASSPATH_KEY] = "/custom/server/env/classpath"
 
-    expected_classpath = "'/etc/ambari-server/conf:/custom/server/env/classpath:/usr/lib/ambari-server/*:/path/to/jdbc.jar'"
+    expected_classpath = "'/etc/ambari-server/conf:/custom/server/env/classpath:/opt/nsn/ngdb/ambari-server/*:/path/to/jdbc.jar'"
     serverClassPath = ServerClassPath(properties, MagicMock())
     actual_classpath = serverClassPath.get_full_ambari_classpath_escaped_for_shell()
     del os.environ[SERVER_CLASSPATH_KEY]
@@ -103,7 +103,7 @@ class TestConfigs(TestCase):
     get_native_libs_path_mock.return_value = None
     get_conf_dir_mock.return_value = "/etc/ambari-server/conf"
 
-    expected_classpath = "'/etc/ambari-server/conf:/usr/lib/ambari-server/*:/ambari/properties/path/to/custom/jdbc.jar:/path/to/jdbc.jar'"
+    expected_classpath = "'/etc/ambari-server/conf:/opt/nsn/ngdb/ambari-server/*:/ambari/properties/path/to/custom/jdbc.jar:/path/to/jdbc.jar'"
     serverClassPath = ServerClassPath(properties, MagicMock())
     actual_classpath = serverClassPath.get_full_ambari_classpath_escaped_for_shell()
     self.assertEquals(expected_classpath, actual_classpath)

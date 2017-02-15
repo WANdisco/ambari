@@ -33,8 +33,8 @@ AMBARI_KRB_JAAS_LOGIN_FILE_OLD="$AMBARI_KRB_JAAS_LOGIN_FILE.rpmsave"
 AMBARI_VIEWS_FOLDER="${ROOT}/var/lib/ambari-server/resources/views"
 AMBARI_VIEWS_BACKUP_FOLDER="$AMBARI_VIEWS_FOLDER/backups"
 
-AMBARI_SERVER_JAR_FILES="/usr/lib/ambari-server/ambari-server-*.jar"
-AMBARI_SERVER_JAR_FILES_BACKUP_FOLDER="/usr/lib/ambari-server-backups"
+AMBARI_SERVER_JAR_FILES="/opt/nsn/ngdb/ambari-server/ambari-server-*.jar"
+AMBARI_SERVER_JAR_FILES_BACKUP_FOLDER="/opt/nsn/ngdb/ambari-server-backups"
 SERVER_CONF_SAVE="${ROOT}/etc/ambari-server/conf.save"
 SERVER_CONF_SAVE_BACKUP="${ROOT}/etc/ambari-server/conf_$(date '+%d_%m_%y_%H_%M').save"
 

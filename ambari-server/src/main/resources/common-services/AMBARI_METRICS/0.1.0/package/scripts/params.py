@@ -132,7 +132,7 @@ ams_monitor_pid_dir = status_params.ams_monitor_pid_dir
 ams_monitor_script = "/usr/sbin/ambari-metrics-monitor"
 
 ams_grafana_script = "/usr/sbin/ambari-metrics-grafana"
-ams_grafana_home_dir = '/usr/lib/ambari-metrics-grafana'
+ams_grafana_home_dir = '/opt/nsn/ngdb/ambari-metrics-grafana'
 ams_grafana_log_dir = default("/configurations/ams-grafana-env/metrics_grafana_log_dir", '/var/log/ambari-metrics-grafana')
 ams_grafana_pid_dir = status_params.ams_grafana_pid_dir
 ams_grafana_conf_dir = '/etc/ambari-metrics-grafana/conf'

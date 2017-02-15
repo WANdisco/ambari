@@ -228,12 +228,12 @@ class TestRangerKMS(RMFTestCase):
       owner = 'kms'
     )
 
-    self.assertResourceCalled('File', '/usr/lib/ambari-agent/DBConnectionVerification.jar',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar',
       content=DownloadSource('http://c6401.ambari.apache.org:8080/resources/DBConnectionVerification.jar'),
       mode=0644,
     )
 
-    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-kms/ews/webapp/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/rangerkms01\' rangerkms01 rangerkms01 com.mysql.jdbc.Driver',
+    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-kms/ews/webapp/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/rangerkms01\' rangerkms01 rangerkms01 com.mysql.jdbc.Driver',
       path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'], tries=5, try_sleep=10, environment = {}
     )
 
@@ -553,12 +553,12 @@ class TestRangerKMS(RMFTestCase):
       owner = 'kms'
     )
 
-    self.assertResourceCalled('File', '/usr/lib/ambari-agent/DBConnectionVerification.jar',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar',
       content=DownloadSource('http://c6401.ambari.apache.org:8080/resources/DBConnectionVerification.jar'),
       mode=0644,
     )
 
-    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /usr/lib/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-kms/ews/webapp/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/rangerkms01\' rangerkms01 rangerkms01 com.mysql.jdbc.Driver',
+    self.assertResourceCalled('Execute', '/usr/jdk64/jdk1.7.0_45/bin/java -cp /opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar:/usr/hdp/current/ranger-kms/ews/webapp/lib/mysql-connector-java.jar org.apache.ambari.server.DBConnectionVerification \'jdbc:mysql://c6401.ambari.apache.org:3306/rangerkms01\' rangerkms01 rangerkms01 com.mysql.jdbc.Driver',
       path=['/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin'], tries=5, try_sleep=10, environment = {}
     )
 

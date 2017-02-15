@@ -50,7 +50,7 @@ valid_path() {
 }
 
 
-export PATH=/usr/sbin:/sbin:/usr/lib/ambari-server/*:$PATH
+export PATH=/usr/sbin:/sbin:/opt/nsn/ngdb/ambari-server/*:$PATH
 export AMBARI_CONF_DIR=/etc/ambari-server/conf:$PATH
 
 # Because Ambari rpm unpacks modules here on all systems
@@ -102,7 +102,7 @@ change_files_permissions() {
 	ambari-sudo.sh chown -R $current_user:$current_group "${AMBARI_AGENT_LOG_DIR:?}/"
 	ambari-sudo.sh chown -R $current_user "/var/lib/ambari-agent/data/"
 	ambari-sudo.sh chown -R $current_user "/var/lib/ambari-agent/cache/"
-	ambari-sudo.sh chown 	$current_user "/usr/lib/ambari-agent/"
+	ambari-sudo.sh chown 	$current_user "/opt/nsn/ngdb/ambari-agent/"
 }
 
 

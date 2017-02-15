@@ -28,7 +28,7 @@ __all__ = ["upload_configuration_to_zk", "create_collection", "setup_kerberos", 
 
 def __create_solr_cloud_cli_prefix(zookeeper_quorum, solr_znode, java64_home, separated_znode=False):
   sudo = AMBARI_SUDO_BINARY
-  solr_cli_prefix = format('{sudo} JAVA_HOME={java64_home} /usr/lib/ambari-infra-solr-client/solrCloudCli.sh ' \
+  solr_cli_prefix = format('{sudo} JAVA_HOME={java64_home} /opt/nsn/ngdb/ambari-infra-solr-client/solrCloudCli.sh ' \
                            '--zookeeper-connect-string {zookeeper_quorum}')
   if separated_znode:
     solr_cli_prefix+=format(' --znode {solr_znode}')
@@ -172,7 +172,7 @@ def create_sasl_users(zookeeper_quorum, solr_znode, jaas_file, java64_home, sasl
   Execute(create_sasl_users_cmd)
 
 def setup_solr_client(config, custom_log4j = True, custom_log_location = None, log4jcontent = None):
-    solr_client_dir = '/usr/lib/ambari-infra-solr-client'
+    solr_client_dir = '/opt/nsn/ngdb/ambari-infra-solr-client'
     solr_client_log_dir = default('/configurations/infra-solr-env/infra_solr_client_log_dir', '/var/log/ambari-infra-solr-client') if custom_log_location is None else custom_log_location
     solr_client_log = format("{solr_client_log_dir}/solr-client.log")
 

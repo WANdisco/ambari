@@ -41,7 +41,7 @@ elif hive_jdbc_driver == "oracle.jdbc.driver.OracleDriver":
   jdbc_jar_name = "ojdbc6.jar"
 
 check_db_connection_jar_name = "DBConnectionVerification.jar"
-check_db_connection_jar = format("/usr/lib/ambari-agent/{check_db_connection_jar_name}")
+check_db_connection_jar = format("/opt/nsn/ngdb/ambari-agent/{check_db_connection_jar_name}")
 
 #common
 hive_metastore_port = config['configurations']['global']['hive_metastore_port']

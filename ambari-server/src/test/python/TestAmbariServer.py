@@ -1085,7 +1085,7 @@ class TestAmbariServer(TestCase):
 
     del os.environ[AMBARI_SERVER_LIB]
     result = get_ambari_jars()
-    self.assertEqual("/usr/lib/ambari-server", result)
+    self.assertEqual("/opt/nsn/ngdb/ambari-server", result)
     self.assertTrue(printInfoMsg_mock.called)
     pass
 
@@ -4885,7 +4885,7 @@ class TestAmbariServer(TestCase):
     self.assertTrue(java_exe_path_mock.called)
     self.assertTrue(get_conf_dir_mock.called)
     self.assertTrue(run_os_command_mock.called)
-    run_os_command_mock.assert_called_with('/usr/lib/java/bin/java -cp \'/etc/conf:/usr/lib/ambari-server/*\' '
+    run_os_command_mock.assert_called_with('/usr/lib/java/bin/java -cp \'/etc/conf:/opt/nsn/ngdb/ambari-server/*\' '
                                           'org.apache.ambari.server.upgrade.StackUpgradeHelper '
                                           'updateStackId ' + "'" + json.dumps(stackIdMap) + "'" +
                                           ' > ' + os.sep + 'var' + os.sep + 'log' + os.sep + 'ambari-server' + os.sep +

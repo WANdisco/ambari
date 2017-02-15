@@ -491,7 +491,7 @@ class ServerConfigDefaultsLinux(ServerConfigDefaults):
 
     # Configuration defaults
     self.DEFAULT_CONF_DIR = AmbariPath.get("/etc/ambari-server/conf")
-    self.DEFAULT_LIBS_DIR = AmbariPath.get("/usr/lib/ambari-server")
+    self.DEFAULT_LIBS_DIR = AmbariPath.get("/opt/nsn/ngdb/ambari-server")
     self.DEFAULT_VLIBS_DIR = AmbariPath.get("/var/lib/ambari-server")
 
     self.AMBARI_PROPERTIES_BACKUP_FILE = "ambari.properties.rpmsave"
@@ -539,7 +539,7 @@ class ServerConfigDefaultsLinux(ServerConfigDefaults):
     ]
     self.NR_CHANGE_OWNERSHIP_LIST = [
       (AmbariPath.get("/var/lib/ambari-server"), "{0}", True),
-      (AmbariPath.get("/usr/lib/ambari-server"), "{0}", True),
+      (AmbariPath.get("/opt/nsn/ngdb/ambari-server"), "{0}", True),
       (self.OUT_DIR, "{0}", True),
       (self.PID_DIR, "{0}", True),
       (AmbariPath.get("/etc/ambari-server"), "{0}", True),

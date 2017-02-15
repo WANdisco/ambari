@@ -89,9 +89,9 @@ export PID_DIR={{kafka_pid_dir}}
 export LOG_DIR={{kafka_log_dir}}
 export KAFKA_KERBEROS_PARAMS={{kafka_kerberos_params}}
 # Add kafka sink to classpath and related depenencies
-if [ -e "/usr/lib/ambari-metrics-kafka-sink/ambari-metrics-kafka-sink.jar" ]; then
-  export CLASSPATH=$CLASSPATH:/usr/lib/ambari-metrics-kafka-sink/ambari-metrics-kafka-sink.jar
-  export CLASSPATH=$CLASSPATH:/usr/lib/ambari-metrics-kafka-sink/lib/*
+if [ -e "/opt/nsn/ngdb/ambari-metrics-kafka-sink/ambari-metrics-kafka-sink.jar" ]; then
+  export CLASSPATH=$CLASSPATH:/opt/nsn/ngdb/ambari-metrics-kafka-sink/ambari-metrics-kafka-sink.jar
+  export CLASSPATH=$CLASSPATH:/opt/nsn/ngdb/ambari-metrics-kafka-sink/lib/*
 fi
 if [ -f /etc/kafka/conf/kafka-ranger-env.sh ]; then
 . /etc/kafka/conf/kafka-ranger-env.sh

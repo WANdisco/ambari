@@ -106,7 +106,7 @@ if security_enabled:
 #####################################
 # Logsearch configs
 #####################################
-logsearch_dir = '/usr/lib/ambari-logsearch-portal'
+logsearch_dir = '/opt/nsn/ngdb/ambari-logsearch-portal'
 
 logsearch_collection_service_logs_numshards_config = config['configurations']['logsearch-properties']['logsearch.collection.service.logs.numshards']
 logsearch_collection_audit_logs_numshards_config = config['configurations']['logsearch-properties']['logsearch.collection.audit.logs.numshards']
@@ -244,7 +244,7 @@ logsearch_auth_external_login_url = config['configurations']['logsearch-properti
 # Logfeeder configs
 #####################################
 
-logfeeder_dir = "/usr/lib/ambari-logsearch-logfeeder"
+logfeeder_dir = "/opt/nsn/ngdb/ambari-logsearch-logfeeder"
 
 # logfeeder-env configs
 logfeeder_log_dir = config['configurations']['logfeeder-env']['logfeeder_log_dir']

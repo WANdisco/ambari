@@ -15,9 +15,9 @@
 
 
 RESOURCE_MANAGEMENT_DIR="/usr/lib/python2.6/site-packages/resource_management"
-RESOURCE_MANAGEMENT_DIR_AGENT="/usr/lib/ambari-agent/lib/resource_management"
+RESOURCE_MANAGEMENT_DIR_AGENT="/opt/nsn/ngdb/ambari-agent/lib/resource_management"
 JINJA_DIR="/usr/lib/python2.6/site-packages/ambari_jinja2"
-JINJA_AGENT_DIR="/usr/lib/ambari-agent/lib/ambari_jinja2"
+JINJA_AGENT_DIR="/opt/nsn/ngdb/ambari-agent/lib/ambari_jinja2"
 
 # remove RESOURCE_MANAGEMENT_DIR if it's a directory
 if [ -d "$RESOURCE_MANAGEMENT_DIR" ]; then  # resource_management dir exists

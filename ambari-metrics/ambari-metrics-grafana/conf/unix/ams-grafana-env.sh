@@ -17,7 +17,7 @@
 # Set environment variables here.
 
 # AMS Grafana Home Dir
-export AMS_GRAFANA_HOME_DIR=/usr/lib/ambari-metrics-grafana
+export AMS_GRAFANA_HOME_DIR=/opt/nsn/ngdb/ambari-metrics-grafana
 
 # AMS Grafana Data Dir
 export AMS_GRAFANA_DATA_DIR=/var/lib/ambari-metrics-grafana

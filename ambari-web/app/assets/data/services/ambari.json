@@ -61,7 +61,7 @@
           "server.version.file" : "/var/lib/ambari-server/resources/version",
           "stackadvisor.script" : "/var/lib/ambari-server/resources/scripts/stack_advisor.py",
           "ulimit.open.files" : "10000",
-          "webapp.dir" : "/usr/lib/ambari-server/web"
+          "webapp.dir" : "/opt/nsn/ngdb/ambari-server/web"
         }
       }
     }

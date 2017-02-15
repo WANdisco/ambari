@@ -19,7 +19,7 @@ rem ##################################################################
 
 set COMMON_DIR="/usr/lib/python2.6/site-packages/common_functions"
 set INSTALL_HELPER_AGENT="/var/lib/ambari-agent/install-helper.sh"
-set COMMON_DIR_SERVER="/usr/lib/ambari-server/lib/common_functions"
+set COMMON_DIR_SERVER="/opt/nsn/ngdb/ambari-server/lib/common_functions"
 
 set PYTHON_WRAPER_TARGET="/usr/bin/ambari-python-wrap"
 set PYTHON_WRAPER_SOURCE="/var/lib/ambari-server/ambari-python-wrap"

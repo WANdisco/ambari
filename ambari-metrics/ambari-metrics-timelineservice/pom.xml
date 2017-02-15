@@ -120,7 +120,7 @@
           <mappings>
             <mapping>
               <!--jars-->
-              <directory>/usr/lib/ambari-metrics-collector/</directory>
+              <directory>/opt/nsn/ngdb/ambari-metrics-collector/</directory>
               <sources>
                 <source>
                   <location>target/lib</location>

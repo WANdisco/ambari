@@ -82,7 +82,7 @@ def oozie(is_server=False # TODO: see if see can remove this
   if params.jdbc_driver_name == "com.mysql.jdbc.Driver" or \
      params.jdbc_driver_name == "org.postgresql.Driver" or \
      params.jdbc_driver_name == "oracle.jdbc.driver.OracleDriver":
-    Execute(format("/bin/sh -c 'cd /usr/lib/ambari-agent/ &&\
+    Execute(format("/bin/sh -c 'cd /opt/nsn/ngdb/ambari-agent/ &&\
     curl -kf -x \"\" \
     --retry 5 {jdk_location}{check_db_connection_jar_name}\
      -o {check_db_connection_jar_name}'"),

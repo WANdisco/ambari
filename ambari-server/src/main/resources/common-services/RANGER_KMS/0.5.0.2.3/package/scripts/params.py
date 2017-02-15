@@ -227,7 +227,7 @@ if current_host in ranger_kms_hosts:
   kms_host = current_host
 
 check_db_connection_jar_name = "DBConnectionVerification.jar"
-check_db_connection_jar = format("/usr/lib/ambari-agent/{check_db_connection_jar_name}")
+check_db_connection_jar = format("/opt/nsn/ngdb/ambari-agent/{check_db_connection_jar_name}")
 ranger_kms_jdbc_connection_url = config['configurations']['dbks-site']['ranger.ks.jpa.jdbc.url']
 ranger_kms_jdbc_driver = config['configurations']['dbks-site']['ranger.ks.jpa.jdbc.driver']
 

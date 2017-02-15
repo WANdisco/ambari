@@ -61,8 +61,8 @@ zookeeper_hosts = ",".join(zookeeper_hosts_list)
 
 # Only supporting SolrCloud mode - so hardcode those options
 solr_cloudmode = 'true'
-solr_dir = '/usr/lib/ambari-infra-solr'
-solr_client_dir = '/usr/lib/ambari-infra-solr-client'
+solr_dir = '/opt/nsn/ngdb/ambari-infra-solr'
+solr_client_dir = '/opt/nsn/ngdb/ambari-infra-solr-client'
 solr_bindir = solr_dir + '/bin'
 cloud_scripts = solr_dir + '/server/scripts/cloud-scripts'
 

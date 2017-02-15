@@ -38,7 +38,7 @@
     <package.pid.dir>/var/run/ambari-shell</package.pid.dir>
     <skipTests>false</skipTests>
     <install.dir>/usr/lib/python2.6/site-packages/ambari_shell</install.dir>
-    <lib.dir>/usr/lib/ambari-shell/lib</lib.dir>
+    <lib.dir>/opt/nsn/ngdb/ambari-shell/lib</lib.dir>
     <python.ver>python &gt;= 2.6</python.ver>
     <deb.python.ver>python (&gt;= 2.6)</deb.python.ver>
     <deb.architecture>amd64</deb.architecture>

@@ -43,7 +43,7 @@ class TestLogFeeder(RMFTestCase):
                               mode=0755
                               )
 
-    self.assertResourceCalled('Directory', '/usr/lib/ambari-logsearch-logfeeder',
+    self.assertResourceCalled('Directory', '/opt/nsn/ngdb/ambari-logsearch-logfeeder',
                               create_parents=True,
                               recursive_ownership=True,
                               cd_access='a',
@@ -108,7 +108,7 @@ class TestLogFeeder(RMFTestCase):
                        )
 
     self.configureResourcesCalled()
-    self.assertResourceCalled('Execute', ('/usr/lib/ambari-logsearch-logfeeder/run.sh',),
+    self.assertResourceCalled('Execute', ('/opt/nsn/ngdb/ambari-logsearch-logfeeder/run.sh',),
                               sudo=True,
                               environment={
                                 'LOGFEEDER_INCLUDE': '/etc/ambari-logsearch-logfeeder/conf/logfeeder-env.sh'}

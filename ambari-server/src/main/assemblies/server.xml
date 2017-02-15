@@ -41,7 +41,7 @@
   <fileSets>
     <fileSet>
       <directory>${ambari-web-dir}</directory>
-      <outputDirectory>/usr/lib/ambari-server/web</outputDirectory>
+      <outputDirectory>/opt/nsn/ngdb/ambari-server/web</outputDirectory>
     </fileSet>
     <fileSet>
       <directory>${project.basedir}/../ambari-common/src/main/python/ambari_commons</directory>
@@ -190,7 +190,7 @@
   <files>
     <file>
       <source>${project.build.directory}/${project.artifactId}-${project.version}.jar</source>
-      <outputDirectory>/usr/lib/ambari-server</outputDirectory>
+      <outputDirectory>/opt/nsn/ngdb/ambari-server</outputDirectory>
     </file>
     <file>
       <fileMode>755</fileMode>
@@ -335,7 +335,7 @@
   </files>    
   <dependencySets>
     <dependencySet>
-      <outputDirectory>/usr/lib/ambari-server</outputDirectory>
+      <outputDirectory>/opt/nsn/ngdb/ambari-server</outputDirectory>
       <unpack>false</unpack>
       <scope>compile</scope>
     </dependencySet>

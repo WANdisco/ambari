@@ -134,7 +134,7 @@ class TestOozieServer(RMFTestCase):
                               owner = 'oozie',
                               group = 'hadoop',
                               )
-    self.assertResourceCalled('File', '/usr/lib/ambari-agent/DBConnectionVerification.jar',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ambari-agent/DBConnectionVerification.jar',
                               content = DownloadSource('http://c6401.ambari.apache.org:8080/resources/DBConnectionVerification.jar'),
                               )
     self.assertResourceCalled('File', '/etc/oozie/conf/hadoop-config.xml',

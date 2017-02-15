@@ -49,7 +49,7 @@ ROOT="/"
 ROOT=`echo $ROOT | sed 's/\/$//'`
 export ROOT
 
-export PATH=$ROOT/usr/lib/ambari-server/*:$PATH:/sbin/:/usr/sbin
+export PATH=$ROOT/opt/nsn/ngdb/ambari-server/*:$PATH:/sbin/:/usr/sbin
 export AMBARI_CONF_DIR=$ROOT/etc/ambari-server/conf
 
 PYTHON_WRAP="$ROOT/usr/bin/ambari-python-wrap"

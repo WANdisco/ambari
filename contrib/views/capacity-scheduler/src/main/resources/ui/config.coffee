@@ -67,5 +67,5 @@ exports.config =
   overrides:
     development:
       paths:
-        public: '/usr/lib/ambari-server/web/views-debug/CAPACITY-SCHEDULER/0.4.0/AUTO_CS_INSTANCE/'
+        public: '/opt/nsn/ngdb/ambari-server/web/views-debug/CAPACITY-SCHEDULER/0.4.0/AUTO_CS_INSTANCE/'
 
