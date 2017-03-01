@@ -31,8 +31,11 @@ class BeforeInstallHook(Hook):
 
     fix_tmp_dir_permissions()
 
-    wdd_stack.setup()
     repo_initialization.install_repos()
+    if not os.path.isfile("/opt/nsn/ngdb/wdd/wdd-select"):
+      Package("wdd-select")
+
+    wdd_stack.setup()
     users_initialization.setup_users()
     java_installer.setup_java()
 
