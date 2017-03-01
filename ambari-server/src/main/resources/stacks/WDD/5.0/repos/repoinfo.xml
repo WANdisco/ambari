@@ -18,16 +18,16 @@
 <reposinfo>
   <os family="redhat6">
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/test</baseurl>
-      <repoid>NSN-2.28</repoid>
-      <reponame>NSN</reponame>
+      <baseurl>https://public-repo.wandisco.com/nexus/service/local/yum/repos/rpm/wdd5.0.0</baseurl>
+      <repoid>WDD-5.0.0</repoid>
+      <reponame>WDD</reponame>
     </repo>
   </os>
   <os family="redhat7">
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/test</baseurl>
-      <repoid>NSN-2.28</repoid>
-      <reponame>NSN</reponame>
+      <baseurl>https://public-repo.wandisco.com/nexus/service/local/yum/repos/rpm/wdd5.0.0</baseurl>
+      <repoid>WDD-5.0.0</repoid>
+      <reponame>WDD</reponame>
     </repo>
   </os>
 </reposinfo>
