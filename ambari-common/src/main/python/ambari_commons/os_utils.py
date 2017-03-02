@@ -159,11 +159,11 @@ def extract_path_component(path, path_fragment):
 # Gets the full path of the ambari repo file for the current OS
 def get_ambari_repo_file_full_name():
   if OSCheck.is_ubuntu_family():
-    ambari_repo_file = "/etc/apt/sources.list.d/ambari.list"
+    ambari_repo_file = "/etc/apt/sources.list.d/WDD.list"
   elif OSCheck.is_redhat_family():
-    ambari_repo_file = "/etc/yum.repos.d/ambari.repo"
+    ambari_repo_file = "/etc/yum.repos.d/WDD.repo"
   elif OSCheck.is_suse_family():
-    ambari_repo_file = "/etc/zypp/repos.d/ambari.repo"
+    ambari_repo_file = "/etc/zypp/repos.d/WDD.repo"
   elif OSCheck.is_windows_family():
     ambari_repo_file = os.path.join(os.environ[ChocolateyConsts.CHOCOLATEY_INSTALL_VAR_NAME],
                                     ChocolateyConsts.CHOCOLATEY_CONFIG_DIR, ChocolateyConsts.CHOCOLATEY_CONFIG_FILENAME)
