@@ -33,16 +33,19 @@ def link_config_scripts():
 
 
 def patch_hadoop_config():
-    File(nsn_distro_root + "/hadoop/libexec/hadoop-config.sh",
-         content=StaticFile('hadoop-config.sh'),
-         mode=0755)
-    File(nsn_distro_root + "/hadoop/hadoop-yarn-applications-distributedshell.jar",
-         content=StaticFile('hadoop-yarn-applications-distributedshell.jar'),
-         mode=0755)
-    Link(nsn_distro_root + "/hadoop/hadoop-mapreduce-examples-2.7.3.jar",
-         to=nsn_distro_root + "/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.3.jar",
-         not_if='ls {0}'.format(nsn_distro_root + "/hadoop/hadoop-mapreduce-examples-2.7.3.jar")
-         )
+    hadoop_dir = os.path.join(nsn_distro_root, "hadoop")
+    hadoop_yarn_apps_distributedshell = os.path.join(hadoop_dir, "hadoop-yarn-applications-distributedshell.jar")
+    if os.path.isdir(hadoop_dir) and not os.path.exists(hadoop_yarn_apps_distributedshell):
+        File(os.path.join(hadoop_dir, "libexec", "hadoop-config.sh"),
+             content=StaticFile('hadoop-config.sh'),
+             mode=0755)
+        File(hadoop_yarn_apps_distributedshell,
+             content=StaticFile('hadoop-yarn-applications-distributedshell.jar'),
+             mode=0755)
+        Link(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
+             to=nsn_distro_root + "/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.3.jar",
+             not_if='ls {0}'.format(nsn_distro_root + "/hadoop/hadoop-mapreduce-examples-2.7.3.jar")
+             )
 
 
 def setup_user_environment():
