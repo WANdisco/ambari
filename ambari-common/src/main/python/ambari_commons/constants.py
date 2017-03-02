@@ -18,6 +18,11 @@ limitations under the License.
 
 """
 
+class PATH:
+  AMBARI_AGENT="/opt/nsn/ngdb/ambari-agent"
+
+
+
 AMBARI_SUDO_BINARY = "ambari-sudo.sh"
 
 UPGRADE_TYPE_ROLLING = "rolling"

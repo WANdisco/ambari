@@ -24,7 +24,7 @@ import os
 
 from urlparse import urlparse
 
-from ambari_commons.constants import AMBARI_SUDO_BINARY
+from ambari_commons.constants import AMBARI_SUDO_BINARY, PATH
 from ambari_commons.os_check import OSCheck
 
 from resource_management.libraries.resources.hdfs_resource import HdfsResource
@@ -279,7 +279,7 @@ driver_curl_source = format("{jdk_location}/{jdbc_jar_name}")
 source_jdbc_file = format("{stack_root}/{current_version}/hive/lib/{jdbc_jar_name}")
 
 check_db_connection_jar_name = "DBConnectionVerification.jar"
-check_db_connection_jar = format("/usr/lib/ambari-agent/{check_db_connection_jar_name}")
+check_db_connection_jar = format(PATH.AMBARI_AGENT + "/{check_db_connection_jar_name}")
 hive_jdbc_drivers_list = ["com.microsoft.sqlserver.jdbc.SQLServerDriver","com.mysql.jdbc.Driver",
                           "org.postgresql.Driver","oracle.jdbc.driver.OracleDriver","sap.jdbc4.sqlanywhere.IDriver"]
 

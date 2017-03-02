@@ -20,7 +20,7 @@ limitations under the License.
 import os
 import re
 
-from ambari_commons.constants import UPGRADE_TYPE_NON_ROLLING, UPGRADE_TYPE_ROLLING
+from ambari_commons.constants import UPGRADE_TYPE_NON_ROLLING, UPGRADE_TYPE_ROLLING, PATH
 from resource_management.core.exceptions import Fail
 from resource_management.core.logger import Logger
 from resource_management.core.resources.system import File, Directory, Execute, Link
@@ -72,7 +72,7 @@ def setup_ranger_admin(upgrade_type=None):
 
   copy_jdbc_connector()
 
-  File(format("/usr/lib/ambari-agent/{check_db_connection_jar_name}"),
+  File(format(PATH.AMBARI_AGENT + "/{check_db_connection_jar_name}"),
     content = DownloadSource(format("{jdk_location}{check_db_connection_jar_name}")),
     mode = 0644,
   )

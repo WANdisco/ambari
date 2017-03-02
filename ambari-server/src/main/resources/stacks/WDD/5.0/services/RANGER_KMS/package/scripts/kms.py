@@ -25,6 +25,8 @@ import ambari_simplejson as json # simplejson is much faster comparing to Python
 import urllib2, base64, httplib
 from StringIO import StringIO as BytesIO
 from datetime import datetime
+
+from ambari_commons.constants import PATH
 from resource_management.core.resources.system import File, Directory, Execute
 from resource_management.libraries.resources.xml_config import XmlConfig
 from resource_management.libraries.resources.modify_properties_file import ModifyPropertiesFile
@@ -147,7 +149,7 @@ def kms(upgrade_type=None):
 
     copy_jdbc_connector()
 
-    File(format("/usr/lib/ambari-agent/{check_db_connection_jar_name}"),
+    File(format(PATH.AMBARI_AGENT + "/{check_db_connection_jar_name}"),
       content = DownloadSource(format("{jdk_location}{check_db_connection_jar_name}")),
       mode = 0644,
     )

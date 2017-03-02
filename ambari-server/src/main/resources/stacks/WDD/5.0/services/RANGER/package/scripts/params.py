@@ -19,6 +19,8 @@ limitations under the License.
 """
 
 import os
+
+from ambari_commons.constants import PATH
 from resource_management.libraries.script import Script
 from resource_management.libraries.functions.version import format_stack_version
 from resource_management.libraries.functions.format import format
@@ -207,7 +209,7 @@ if db_flavor.lower() == 'sqla':
 
 #for db connection
 check_db_connection_jar_name = "DBConnectionVerification.jar"
-check_db_connection_jar = format("/usr/lib/ambari-agent/{check_db_connection_jar_name}")
+check_db_connection_jar = format(PATH.AMBARI_AGENT + "/{check_db_connection_jar_name}")
 ranger_jdbc_connection_url = config["configurations"]["ranger-admin-site"]["ranger.jpa.jdbc.url"]
 ranger_jdbc_driver = config["configurations"]["ranger-admin-site"]["ranger.jpa.jdbc.driver"]
 

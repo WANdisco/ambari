@@ -40,7 +40,7 @@ from resource_management.core.shell import quote_bash_args
 from resource_management.core.logger import Logger
 from resource_management.core import utils
 from resource_management.libraries.functions.setup_atlas_hook import has_atlas_in_cluster, setup_atlas_hook
-from ambari_commons.constants import SERVICE
+from ambari_commons.constants import SERVICE, PATH
 
 from ambari_commons.os_family_impl import OsFamilyFuncImpl, OsFamilyImpl
 from ambari_commons import OSConst
@@ -281,7 +281,7 @@ def hive(name=None):
     if params.hive2_jdbc_target is not None and not os.path.exists(params.hive2_jdbc_target):
       jdbc_connector(params.hive2_jdbc_target, params.hive2_previous_jdbc_jar)
 
-  File(format("/usr/lib/ambari-agent/{check_db_connection_jar_name}"),
+  File(format(PATH.AMBARI_AGENT + "/{check_db_connection_jar_name}"),
        content = DownloadSource(format("{jdk_location}{check_db_connection_jar_name}")),
        mode = 0644,
   )

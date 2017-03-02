@@ -18,6 +18,8 @@ limitations under the License.
 
 """
 import os
+
+from ambari_commons.constants import PATH
 from resource_management.libraries.functions import conf_select
 from resource_management.libraries.script import Script
 from resource_management.libraries.functions.version import format_stack_version
@@ -227,7 +229,7 @@ if current_host in ranger_kms_hosts:
   kms_host = current_host
 
 check_db_connection_jar_name = "DBConnectionVerification.jar"
-check_db_connection_jar = format("/usr/lib/ambari-agent/{check_db_connection_jar_name}")
+check_db_connection_jar = format(PATH.AMBARI_AGENT + "/{check_db_connection_jar_name}")
 ranger_kms_jdbc_connection_url = config['configurations']['dbks-site']['ranger.ks.jpa.jdbc.url']
 ranger_kms_jdbc_driver = config['configurations']['dbks-site']['ranger.ks.jpa.jdbc.driver']
 
