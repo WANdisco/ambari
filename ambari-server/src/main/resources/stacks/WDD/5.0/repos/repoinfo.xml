@@ -19,14 +19,14 @@
   <os family="redhat6">
     <repo>
       <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0/</baseurl>
-      <repoid>WDD-5.0.0</repoid>
+      <repoid>WDD</repoid>
       <reponame>WDD-5.0.0</reponame>
     </repo>
   </os>
   <os family="redhat7">
     <repo>
       <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0/</baseurl>
-      <repoid>WDD-5.0.0</repoid>
+      <repoid>WDD</repoid>
       <reponame>WDD-5.0.0</reponame>
     </repo>
   </os>
