@@ -51,10 +51,11 @@ def patch_hadoop_config():
         File(hadoop_yarn_apps_distributedshell,
              content=StaticFile('hadoop-yarn-applications-distributedshell.jar'),
              mode=0755)
-        hadoop_mapreduce_examples_jar = find_hadoop_mapreduce_examples(hadoop_dir)
-        if hadoop_mapreduce_examples_jar is not None:
-            File(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
-                 content=StaticFile(hadoop_mapreduce_examples_jar))
+
+    hadoop_mapreduce_examples_jar = find_hadoop_mapreduce_examples(hadoop_dir)
+    if hadoop_mapreduce_examples_jar is not None:
+        File(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
+             content=StaticFile(hadoop_mapreduce_examples_jar))
 
 
 def setup_user_environment():
