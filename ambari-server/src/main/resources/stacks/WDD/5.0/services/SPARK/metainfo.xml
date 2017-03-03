@@ -24,7 +24,7 @@
         <service>
             <name>SPARK</name>
             <extends>common-services/SPARK/1.5.2</extends>
-            <version>1.6.3-2.28</version>
+            <version>1.6.3</version>
             <osSpecifics>
                 <osSpecific>
                     <osFamily>redhat6,redhat7</osFamily>

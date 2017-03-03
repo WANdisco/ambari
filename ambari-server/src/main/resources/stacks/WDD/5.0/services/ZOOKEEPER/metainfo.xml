@@ -20,7 +20,7 @@
   <services>
     <service>
       <name>ZOOKEEPER</name>
-      <version>3.4.6-2.28</version>
+      <version>3.4.6</version>
       <displayName>ZooKeeper</displayName>
       <comment>Centralized service which provides highly reliable distributed coordination</comment>
       <extends>common-services/ZOOKEEPER/3.4.6</extends>
