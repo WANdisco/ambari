@@ -1,3 +1,4 @@
+import fnmatch
 import os
 from resource_management import *
 
@@ -31,6 +32,11 @@ def link_config_scripts():
             not_if='ls {0}'.format(system_script_path)
         )
 
+def find_hadoop_mapreduce_examples(hadoop_dir):
+    for file in os.listdir(hadoop_dir + "/share/hadoop/mapreduce/"):
+        if fnmatch.fnmatch(file, 'hadoop-mapreduce-examples-2.*.jar'):
+            return file
+    return None
 
 def patch_hadoop_config():
     hadoop_dir = os.path.join(nsn_distro_root, "hadoop")
@@ -45,10 +51,10 @@ def patch_hadoop_config():
         File(hadoop_yarn_apps_distributedshell,
              content=StaticFile('hadoop-yarn-applications-distributedshell.jar'),
              mode=0755)
-        Link(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
-             to=hadoop_dir + "/share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.3.jar",
-             not_if='ls {0}'.format(hadoop_dir + "/hadoop-mapreduce-examples-2.7.3.jar")
-             )
+        hadoop_mapreduce_examples_jar = find_hadoop_mapreduce_examples(hadoop_dir)
+        if hadoop_mapreduce_examples_jar is not None:
+            File(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
+                 content=StaticFile(hadoop_mapreduce_examples_jar))
 
 
 def setup_user_environment():
