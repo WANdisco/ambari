@@ -34,9 +34,10 @@ def link_config_scripts():
 
 def find_hadoop_mapreduce_examples(hadoop_dir):
     mapreduce_dir = hadoop_dir + "/share/hadoop/mapreduce/"
-    for file in os.listdir(mapreduce_dir):
-        if fnmatch.fnmatch(file, 'hadoop-mapreduce-examples-2.*.jar'):
-            return os.path.join(mapreduce_dir, file)
+    if os.path.isdir(mapreduce_dir):
+        for file in os.listdir(mapreduce_dir):
+            if fnmatch.fnmatch(file, 'hadoop-mapreduce-examples-2.*.jar'):
+                return os.path.join(mapreduce_dir, file)
     return None
 
 def patch_hadoop_config():
