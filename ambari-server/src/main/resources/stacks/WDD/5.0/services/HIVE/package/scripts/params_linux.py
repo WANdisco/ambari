@@ -163,6 +163,7 @@ hive_server_conf_dir = status_params.hive_server_conf_dir
 hcat_conf_dir = '/etc/hive-hcatalog/conf'
 config_dir = '/etc/hive-webhcat/conf'
 hcat_lib = '/usr/lib/hive-hcatalog/share/hcatalog'
+hcatalog_home_dir = format('{stack_root}/current/hive-hcatalog')
 webhcat_bin_dir = '/usr/lib/hive-hcatalog/sbin'
 
 # there are no client versions of these, use server versions directly

@@ -43,6 +43,11 @@ def hcat():
 def hcat():
   import params
 
+  File(os.path.join(params.hcatalog_home_dir, "bin", "hcat"),
+       mode=0755,
+       content=StaticFile('hcat.sh')
+       )
+
   Directory(params.hive_conf_dir,
             create_parents = True,
             owner=params.hcat_user,
