@@ -295,6 +295,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         putHadoopEnvProperty = self.putProperty(configurations, "hadoop-env", services)
         putHDFSSiteProperty = self.putProperty(configurations, "hdfs-site", services)
         putHDFSSitePropertyAttributes = self.putPropertyAttribute(configurations, "hdfs-site")
+        putCoreSitePropertyAttributes = self.putPropertyAttribute(configurations, "core-site")
 
         # calculate recommended memory
         putHadoopEnvProperty('namenode_heapsize', max(int(clusterData['totalAvailableRam'] / 2), 1024))
@@ -354,6 +355,81 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         # recommendations for "hadoop.proxyuser.*.hosts", "hadoop.proxyuser.*.groups" properties in core-site
         self.recommendHadoopProxyUsers(configurations, services, hosts)
 
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if ('ranger-hdfs-plugin-properties' in services['configurations']) and ('ranger-hdfs-plugin-enabled' in services['configurations']['ranger-hdfs-plugin-properties']['properties']):
+            rangerPluginEnabled = services['configurations']['ranger-hdfs-plugin-properties']['properties']['ranger-hdfs-plugin-enabled']
+            if ("RANGER" in servicesList) and (rangerPluginEnabled.lower() == 'Yes'.lower()):
+                putHDFSSiteProperty("dfs.permissions.enabled",'true')
+
+        keyserverHostsString = None
+        keyserverPortString = None
+        if "hadoop-env" in services["configurations"] and "keyserver_host" in \
+            services["configurations"]["hadoop-env"]["properties"] and "keyserver_port" in \
+            services["configurations"]["hadoop-env"]["properties"]:
+            keyserverHostsString = services["configurations"]["hadoop-env"]["properties"]["keyserver_host"]
+            keyserverPortString = services["configurations"]["hadoop-env"]["properties"]["keyserver_port"]
+
+        # Irrespective of what hadoop-env has, if Ranger-KMS is installed, we use its values.
+        rangerKMSServerHosts = self.getHostsWithComponent("RANGER_KMS", "RANGER_KMS_SERVER", services, hosts)
+        if rangerKMSServerHosts is not None and len(rangerKMSServerHosts) > 0:
+            rangerKMSServerHostsArray = []
+            for rangeKMSServerHost in rangerKMSServerHosts:
+                rangerKMSServerHostsArray.append(rangeKMSServerHost["Hosts"]["host_name"])
+            keyserverHostsString = ";".join(rangerKMSServerHostsArray)
+            if "kms-env" in services["configurations"] and "kms_port" in services["configurations"]["kms-env"][
+                "properties"]:
+                keyserverPortString = services["configurations"]["kms-env"]["properties"]["kms_port"]
+
+        if keyserverHostsString is not None and len(keyserverHostsString.strip()) > 0:
+            urlScheme = "http"
+            if "ranger-kms-site" in services["configurations"] and \
+                            "ranger.service.https.attrib.ssl.enabled" in services["configurations"]["ranger-kms-site"][
+                        "properties"] and \
+                            services["configurations"]["ranger-kms-site"]["properties"][
+                                "ranger.service.https.attrib.ssl.enabled"].lower() == "true":
+                urlScheme = "https"
+
+            if keyserverPortString is None or len(keyserverPortString.strip()) < 1:
+                keyserverPortString = ":9292"
+            else:
+                keyserverPortString = ":" + keyserverPortString.strip()
+            putCoreSiteProperty = self.putProperty(configurations, "core-site", services)
+            kmsPath = "kms://" + urlScheme + "@" + keyserverHostsString.strip() + keyserverPortString + "/kms"
+            putCoreSiteProperty("hadoop.security.key.provider.path", kmsPath)
+            putHDFSSiteProperty("dfs.encryption.key.provider.uri", kmsPath)
+
+        if "ranger-env" in services["configurations"] and "ranger-hdfs-plugin-properties" in services["configurations"] and \
+            "ranger-hdfs-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            putHdfsRangerPluginProperty = self.putProperty(configurations, "ranger-hdfs-plugin-properties", services)
+            rangerEnvHdfsPluginProperty = services["configurations"]["ranger-env"]["properties"][
+                "ranger-hdfs-plugin-enabled"]
+            putHdfsRangerPluginProperty("ranger-hdfs-plugin-enabled", rangerEnvHdfsPluginProperty)
+
+        if ('ranger-hdfs-plugin-properties' in services['configurations']) and (
+            'ranger-hdfs-plugin-enabled' in services['configurations']['ranger-hdfs-plugin-properties']['properties']):
+            rangerPluginEnabled = ''
+            if 'ranger-hdfs-plugin-properties' in configurations and 'ranger-hdfs-plugin-enabled' in \
+                    configurations['ranger-hdfs-plugin-properties']['properties']:
+                rangerPluginEnabled = configurations['ranger-hdfs-plugin-properties']['properties'][
+                    'ranger-hdfs-plugin-enabled']
+            elif 'ranger-hdfs-plugin-properties' in services['configurations'] and 'ranger-hdfs-plugin-enabled' in \
+                    services['configurations']['ranger-hdfs-plugin-properties']['properties']:
+                rangerPluginEnabled = services['configurations']['ranger-hdfs-plugin-properties']['properties'][
+                    'ranger-hdfs-plugin-enabled']
+
+            if rangerPluginEnabled and (rangerPluginEnabled.lower() == 'Yes'.lower()):
+                putHDFSSiteProperty("dfs.namenode.inode.attributes.provider.class",
+                                    'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer')
+            else:
+                putHDFSSitePropertyAttributes('dfs.namenode.inode.attributes.provider.class', 'delete', 'true')
+        else:
+            putHDFSSitePropertyAttributes('dfs.namenode.inode.attributes.provider.class', 'delete', 'true')
+
+        if not "RANGER_KMS" in servicesList:
+            putCoreSitePropertyAttributes('hadoop.security.key.provider.path', 'delete', 'true')
+            putHDFSSitePropertyAttributes('dfs.encryption.key.provider.uri', 'delete', 'true')
+
+
     def recommendHbaseConfigurations(self, configurations, clusterData, services, hosts):
         # recommendations for HBase env config
 
@@ -393,6 +469,8 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         protocol = 'http'
         ranger_admin_host = 'localhost'
         port = '6080'
+
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
 
         # Check if http is disabled. For HDP-2.3 this can be checked in ranger-admin-site/ranger.service.http.enabled
         # For Ranger-0.4.0 this can be checked in ranger-site/http.enabled
@@ -438,78 +516,36 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
             putRangerAdminProperty('policymgr_external_url', policymgr_external_url)
 
-        rangerServiceVersion = [service['StackServices']['service_version'] for service in services["services"] if service['StackServices']['service_name'] == 'RANGER'][0]
-        if rangerServiceVersion == '0.4.0':
-            # Recommend ldap settings based on ambari.properties configuration
-            # If 'ambari.ldap.isConfigured' == true
-            # For Ranger version 0.4.0
-            if 'ambari-server-properties' in services and \
-                            'ambari.ldap.isConfigured' in services['ambari-server-properties'] and \
-                            services['ambari-server-properties']['ambari.ldap.isConfigured'].lower() == "true":
-                putUserSyncProperty = self.putProperty(configurations, "usersync-properties", services)
-                serverProperties = services['ambari-server-properties']
-                if 'authentication.ldap.managerDn' in serverProperties:
-                    putUserSyncProperty('SYNC_LDAP_BIND_DN', serverProperties['authentication.ldap.managerDn'])
-                if 'authentication.ldap.primaryUrl' in serverProperties:
-                    ldap_protocol =  'ldap://'
-                    if 'authentication.ldap.useSSL' in serverProperties and serverProperties['authentication.ldap.useSSL'] == 'true':
-                        ldap_protocol =  'ldaps://'
-                    ldapUrl = ldap_protocol + serverProperties['authentication.ldap.primaryUrl'] if serverProperties['authentication.ldap.primaryUrl'] else serverProperties['authentication.ldap.primaryUrl']
-                    putUserSyncProperty('SYNC_LDAP_URL', ldapUrl)
-                if 'authentication.ldap.userObjectClass' in serverProperties:
-                    putUserSyncProperty('SYNC_LDAP_USER_OBJECT_CLASS', serverProperties['authentication.ldap.userObjectClass'])
-                if 'authentication.ldap.usernameAttribute' in serverProperties:
-                    putUserSyncProperty('SYNC_LDAP_USER_NAME_ATTRIBUTE', serverProperties['authentication.ldap.usernameAttribute'])
+        ranger_plugins_serviceuser = [
+            {'service_name': 'HDFS', 'file_name': 'hadoop-env', 'config_name': 'hdfs_user',
+             'target_configname': 'ranger.plugins.hdfs.serviceuser'},
+            {'service_name': 'HIVE', 'file_name': 'hive-env', 'config_name': 'hive_user',
+             'target_configname': 'ranger.plugins.hive.serviceuser'},
+            {'service_name': 'YARN', 'file_name': 'yarn-env', 'config_name': 'yarn_user',
+             'target_configname': 'ranger.plugins.yarn.serviceuser'},
+            {'service_name': 'HBASE', 'file_name': 'hbase-env', 'config_name': 'hbase_user',
+             'target_configname': 'ranger.plugins.hbase.serviceuser'},
+            {'service_name': 'KNOX', 'file_name': 'knox-env', 'config_name': 'knox_user',
+             'target_configname': 'ranger.plugins.knox.serviceuser'},
+            {'service_name': 'STORM', 'file_name': 'storm-env', 'config_name': 'storm_user',
+             'target_configname': 'ranger.plugins.storm.serviceuser'},
+            {'service_name': 'KAFKA', 'file_name': 'kafka-env', 'config_name': 'kafka_user',
+             'target_configname': 'ranger.plugins.kafka.serviceuser'},
+            {'service_name': 'RANGER_KMS', 'file_name': 'kms-env', 'config_name': 'kms_user',
+             'target_configname': 'ranger.plugins.kms.serviceuser'},
+            {'service_name': 'ATLAS', 'file_name': 'atlas-env', 'config_name': 'metadata_user',
+             'target_configname': 'ranger.plugins.atlas.serviceuser'}
+        ]
 
-
-            # Set Ranger Admin Authentication method
-            if 'admin-properties' in services['configurations'] and 'usersync-properties' in services['configurations'] and \
-                            'SYNC_SOURCE' in services['configurations']['usersync-properties']['properties']:
-                rangerUserSyncSource = services['configurations']['usersync-properties']['properties']['SYNC_SOURCE']
-                authenticationMethod = rangerUserSyncSource.upper()
-                if authenticationMethod != 'FILE':
-                    putRangerAdminProperty('authentication_method', authenticationMethod)
-
-            # Recommend xasecure.audit.destination.hdfs.dir
-            # For Ranger version 0.4.0
-            servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
-            putRangerEnvProperty = self.putProperty(configurations, "ranger-env", services)
-            include_hdfs = "HDFS" in servicesList
-            if include_hdfs:
-                if 'core-site' in services['configurations'] and ('fs.defaultFS' in services['configurations']['core-site']['properties']):
-                    default_fs = services['configurations']['core-site']['properties']['fs.defaultFS']
-                    default_fs += '/ranger/audit/%app-type%/%time:yyyyMMdd%'
-                    putRangerEnvProperty('xasecure.audit.destination.hdfs.dir', default_fs)
-
-            # Recommend Ranger Audit properties for ranger supported services
-            # For Ranger version 0.4.0
-            ranger_services = [
-                {'service_name': 'HDFS', 'audit_file': 'ranger-hdfs-plugin-properties'},
-                {'service_name': 'HBASE', 'audit_file': 'ranger-hbase-plugin-properties'},
-                {'service_name': 'HIVE', 'audit_file': 'ranger-hive-plugin-properties'},
-                {'service_name': 'KNOX', 'audit_file': 'ranger-knox-plugin-properties'},
-                {'service_name': 'STORM', 'audit_file': 'ranger-storm-plugin-properties'}
-            ]
-
-            for item in range(len(ranger_services)):
-                if ranger_services[item]['service_name'] in servicesList:
-                    component_audit_file =  ranger_services[item]['audit_file']
-                    if component_audit_file in services["configurations"]:
-                        ranger_audit_dict = [
-                            {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.db', 'target_configname': 'XAAUDIT.DB.IS_ENABLED'},
-                            {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs', 'target_configname': 'XAAUDIT.HDFS.IS_ENABLED'},
-                            {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs.dir', 'target_configname': 'XAAUDIT.HDFS.DESTINATION_DIRECTORY'}
-                        ]
-                        putRangerAuditProperty = self.putProperty(configurations, component_audit_file, services)
-
-                        for item in ranger_audit_dict:
-                            if item['filename'] in services["configurations"] and item['configname'] in  services["configurations"][item['filename']]["properties"]:
-                                if item['filename'] in configurations and item['configname'] in  configurations[item['filename']]["properties"]:
-                                    rangerAuditProperty = configurations[item['filename']]["properties"][item['configname']]
-                                else:
-                                    rangerAuditProperty = services["configurations"][item['filename']]["properties"][item['configname']]
-                                putRangerAuditProperty(item['target_configname'], rangerAuditProperty)
-
+        for item in range(len(ranger_plugins_serviceuser)):
+            if ranger_plugins_serviceuser[item]['service_name'] in servicesList:
+                file_name = ranger_plugins_serviceuser[item]['file_name']
+                config_name = ranger_plugins_serviceuser[item]['config_name']
+                target_configname = ranger_plugins_serviceuser[item]['target_configname']
+                if file_name in services["configurations"] and config_name in services["configurations"][file_name][
+                    "properties"]:
+                    service_user = services["configurations"][file_name]["properties"][config_name]
+                    putRangerAdminProperty(target_configname, service_user)
 
     def recommendHiveConfigurations(self, configurations, clusterData, services, hosts):
         hiveSiteProperties = getSiteProperties(services['configurations'], 'hive-site')
@@ -1568,6 +1604,17 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         clusterEnv = getSiteProperties(configurations, "cluster-env")
         validationItems = [{"config-name": 'dfs.datanode.du.reserved', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'dfs.datanode.du.reserved')},
                            {"config-name": 'dfs.datanode.data.dir', "item": self.validatorOneDataDirPerPartition(properties, 'dfs.datanode.data.dir', services, hosts, clusterEnv)}]
+        hdfs_site = properties
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-hdfs-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-hdfs-plugin-enabled'] if ranger_plugin_properties else 'No'
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if ("RANGER" in servicesList) and (ranger_plugin_enabled.lower() == 'Yes'.lower()):
+            if 'dfs.namenode.inode.attributes.provider.class' not in hdfs_site or \
+                hdfs_site['dfs.namenode.inode.attributes.provider.class'].lower() != 'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer'.lower():
+                validationItems.append({"config-name": 'dfs.namenode.inode.attributes.provider.class',
+                                        "item": self.getWarnItem(
+                                            "dfs.namenode.inode.attributes.provider.class needs to be set to 'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer' if Ranger HDFS Plugin is enabled.")})
+
         return self.toConfigurationValidationProblems(validationItems, "hdfs-site")
 
     def validateHDFSConfigurationsEnv(self, properties, recommendedDefaults, configurations, services, hosts):

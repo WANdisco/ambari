@@ -33,6 +33,9 @@
               <name>hadoop</name>
             </package>
             <package>
+              <name>ranger</name>
+            </package>
+            <package>
               <name>hadoop-lzo</name>
               <skipUpgrade>true</skipUpgrade>
               <condition>should_install_lzo</condition>

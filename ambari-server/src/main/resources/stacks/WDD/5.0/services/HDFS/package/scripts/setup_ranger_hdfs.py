@@ -42,7 +42,8 @@ def setup_ranger_hdfs(upgrade_type=None):
     else:
       Logger.info("HDFS: Setup ranger: command retry not enabled thus skipping if ranger admin is down !")
 
-
+    from resource_management.libraries.functions.setup_ranger_plugin_xml import setup_ranger_plugin_jar_symblink
+    from resource_management.libraries.functions.get_stack_version import get_stack_version
     if params.xml_configurations_supported:
         from resource_management.libraries.functions.setup_ranger_plugin_xml import setup_ranger_plugin
         api_version=None
@@ -67,9 +68,10 @@ def setup_ranger_hdfs(upgrade_type=None):
                              is_stack_supports_ranger_kerberos = params.stack_supports_ranger_kerberos,
                              component_user_principal=params.nn_principal_name if params.security_enabled else None,
                              component_user_keytab=params.nn_keytab if params.security_enabled else None)
+        stack_version = get_stack_version('hadoop-client')
+        setup_ranger_plugin_jar_symblink(stack_version, 'hdfs', component_list=['hadoop-client'])
     else:
         from resource_management.libraries.functions.setup_ranger_plugin import setup_ranger_plugin
-
         setup_ranger_plugin('hadoop-client', 'hdfs', params.previous_jdbc_jar,
                             params.downloaded_custom_connector, params.driver_curl_source,
                             params.driver_curl_target, params.java_home,
@@ -85,6 +87,8 @@ def setup_ranger_hdfs(upgrade_type=None):
                             credential_file=params.credential_file, xa_audit_db_password=params.xa_audit_db_password,
                             ssl_truststore_password=params.ssl_truststore_password, ssl_keystore_password=params.ssl_keystore_password,
                             stack_version_override = stack_version, skip_if_rangeradmin_down= not params.retryAble)
+        stack_version = get_stack_version('hadoop-client')
+        setup_ranger_plugin_jar_symblink(stack_version, 'hdfs', component_list=['hadoop-client'])
 
     if stack_version and params.upgrade_direction == Direction.UPGRADE:
       # when upgrading to stack remove_ranger_hdfs_plugin_env, this env file must be removed

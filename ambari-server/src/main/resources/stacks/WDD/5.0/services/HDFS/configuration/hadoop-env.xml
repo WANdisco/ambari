@@ -360,10 +360,10 @@ fi
 MAPREDUCE_LIBS={{mapreduce_libs_path}}
 
 # Add libraries to the hadoop classpath - some may not need a colon as they already include it
-export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}${JAVA_JDBC_LIBS}:${MAPREDUCE_LIBS}
+export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}${JAVA_JDBC_LIBS}:${MAPREDUCE_LIBS}:/usr/wdd/current/hadoop-hdfs-client/lib/*
 
 if [ -d "/usr/wdd/current/tez-client" ]; then
-  export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:/usr/wdd/current/tez-client/*://usr/wdd/current/tez-client/lib/*:/usr/wdd/current/tez-client/conf
+  export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:/usr/wdd/current/tez-client/*:/usr/wdd/current/tez-client/lib/*:/usr/wdd/current/tez-client/conf
 fi
 
 # Setting path to hdfs command line

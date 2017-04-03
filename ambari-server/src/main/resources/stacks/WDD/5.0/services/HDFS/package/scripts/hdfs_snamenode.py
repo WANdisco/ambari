@@ -21,6 +21,7 @@ from resource_management import *
 from utils import service
 from ambari_commons.os_family_impl import OsFamilyImpl, OsFamilyFuncImpl
 from ambari_commons import OSConst
+from setup_ranger_hdfs import setup_ranger_hdfs
 
 @OsFamilyFuncImpl(os_family=OsFamilyImpl.DEFAULT)
 def snamenode(action=None, format=False):
@@ -39,6 +40,7 @@ def snamenode(action=None, format=False):
          group=params.user_group)
   elif action == "start" or action == "stop":
     import params
+    setup_ranger_hdfs(upgrade_type=None)
     service(
       action=action,
       name="secondarynamenode",
