@@ -126,6 +126,40 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 putYarnPropertyAttribute("yarn.timeline-service.http-authentication.proxyuser.{0}.hosts".format(old_ambari_user), 'delete', 'true')
                 putYarnPropertyAttribute("yarn.timeline-service.http-authentication.proxyuser.{0}.groups".format(old_ambari_user), 'delete', 'true')
 
+        if "ranger-env" in services["configurations"] and "ranger-yarn-plugin-properties" in services[
+            "configurations"] and \
+                        "ranger-yarn-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            putYarnRangerPluginProperty = self.putProperty(configurations, "ranger-yarn-plugin-properties", services)
+            rangerEnvYarnPluginProperty = services["configurations"]["ranger-env"]["properties"][
+                "ranger-yarn-plugin-enabled"]
+            putYarnRangerPluginProperty("ranger-yarn-plugin-enabled", rangerEnvYarnPluginProperty)
+        rangerPluginEnabled = ''
+        if 'ranger-yarn-plugin-properties' in configurations and 'ranger-yarn-plugin-enabled' in \
+                configurations['ranger-yarn-plugin-properties']['properties']:
+            rangerPluginEnabled = configurations['ranger-yarn-plugin-properties']['properties'][
+                'ranger-yarn-plugin-enabled']
+        elif 'ranger-yarn-plugin-properties' in services['configurations'] and 'ranger-yarn-plugin-enabled' in \
+                services['configurations']['ranger-yarn-plugin-properties']['properties']:
+            rangerPluginEnabled = services['configurations']['ranger-yarn-plugin-properties']['properties'][
+                'ranger-yarn-plugin-enabled']
+
+        if rangerPluginEnabled and (rangerPluginEnabled.lower() == 'Yes'.lower()):
+            putYarnProperty('yarn.acl.enable', 'true')
+            putYarnProperty('yarn.authorization-provider',
+                                'org.apache.ranger.authorization.yarn.authorizer.RangerYarnAuthorizer')
+        else:
+            putYarnPropertyAttribute('yarn.authorization-provider', 'delete', 'true')
+
+        if 'yarn-site' in services["configurations"] and 'yarn.resourcemanager.proxy-user-privileges.enabled' in \
+                services["configurations"]["yarn-site"]["properties"]:
+            if self.isSecurityEnabled(services):
+                # enable proxy-user privileges for secure clusters for long-running services (spark streaming etc)
+                putYarnProperty('yarn.resourcemanager.proxy-user-privileges.enabled', 'true')
+                if 'RANGER_KMS' in servicesList:
+                    # disable proxy-user privileges on secure clusters as it does not work with TDE
+                    putYarnProperty('yarn.resourcemanager.proxy-user-privileges.enabled', 'false')
+            else:
+                putYarnProperty('yarn.resourcemanager.proxy-user-privileges.enabled', 'false')
 
     def recommendMapReduce2Configurations(self, configurations, clusterData, services, hosts):
         putMapredProperty = self.putProperty(configurations, "mapred-site", services)
@@ -464,6 +498,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
     def recommendRangerConfigurations(self, configurations, clusterData, services, hosts):
 
         putRangerAdminProperty = self.putProperty(configurations, "admin-properties", services)
+        putRangerEnvProperty = self.putProperty(configurations, "ranger-env", services)
 
         # Build policymgr_external_url
         protocol = 'http'
@@ -542,10 +577,58 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 file_name = ranger_plugins_serviceuser[item]['file_name']
                 config_name = ranger_plugins_serviceuser[item]['config_name']
                 target_configname = ranger_plugins_serviceuser[item]['target_configname']
-                if file_name in services["configurations"] and config_name in services["configurations"][file_name][
-                    "properties"]:
+                if file_name in services["configurations"] and config_name in services["configurations"][file_name]["properties"]:
                     service_user = services["configurations"][file_name]["properties"][config_name]
                     putRangerAdminProperty(target_configname, service_user)
+
+        # Recommend ranger.audit.solr.zookeepers and xasecure.audit.destination.hdfs.dir
+        include_hdfs = "HDFS" in servicesList
+        if include_hdfs:
+            if 'core-site' in services['configurations'] and ('fs.defaultFS' in services['configurations']['core-site']['properties']):
+                default_fs = services['configurations']['core-site']['properties']['fs.defaultFS']
+                putRangerEnvProperty('xasecure.audit.destination.hdfs.dir', '{0}/{1}/{2}'.format(default_fs, 'ranger', 'audit'))
+
+        # Recommend Ranger supported service's audit properties
+        ranger_services = [
+            {'service_name': 'HDFS', 'audit_file': 'ranger-hdfs-audit'},
+            {'service_name': 'YARN', 'audit_file': 'ranger-yarn-audit'},
+            {'service_name': 'HBASE', 'audit_file': 'ranger-hbase-audit'},
+            {'service_name': 'HIVE', 'audit_file': 'ranger-hive-audit'},
+            {'service_name': 'KNOX', 'audit_file': 'ranger-knox-audit'},
+            {'service_name': 'KAFKA', 'audit_file': 'ranger-kafka-audit'},
+            {'service_name': 'STORM', 'audit_file': 'ranger-storm-audit'}
+        ]
+
+        for item in range(len(ranger_services)):
+            if ranger_services[item]['service_name'] in servicesList:
+                component_audit_file = ranger_services[item]['audit_file']
+                if component_audit_file in services["configurations"]:
+                    ranger_audit_dict = [
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.db',
+                         'target_configname': 'xasecure.audit.destination.db'},
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs',
+                         'target_configname': 'xasecure.audit.destination.hdfs'},
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs.dir',
+                         'target_configname': 'xasecure.audit.destination.hdfs.dir'},
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.solr',
+                         'target_configname': 'xasecure.audit.destination.solr'},
+                        {'filename': 'ranger-admin-site', 'configname': 'ranger.audit.solr.urls',
+                         'target_configname': 'xasecure.audit.destination.solr.urls'},
+                        {'filename': 'ranger-admin-site', 'configname': 'ranger.audit.solr.zookeepers',
+                         'target_configname': 'xasecure.audit.destination.solr.zookeepers'}
+                    ]
+                    putRangerAuditProperty = self.putProperty(configurations, component_audit_file, services)
+
+                    for item in ranger_audit_dict:
+                        if item['filename'] in services["configurations"] and item['configname'] in \
+                                services["configurations"][item['filename']]["properties"]:
+                            if item['filename'] in configurations and item['configname'] in \
+                                    configurations[item['filename']]["properties"]:
+                                rangerAuditProperty = configurations[item['filename']]["properties"][item['configname']]
+                            else:
+                                rangerAuditProperty = services["configurations"][item['filename']]["properties"][
+                                    item['configname']]
+                            putRangerAuditProperty(item['target_configname'], rangerAuditProperty)
 
     def recommendHiveConfigurations(self, configurations, clusterData, services, hosts):
         hiveSiteProperties = getSiteProperties(services['configurations'], 'hive-site')
@@ -1587,6 +1670,16 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                             {"config-name": 'yarn.scheduler.minimum-allocation-mb', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'yarn.scheduler.minimum-allocation-mb')},
                             {"config-name": 'yarn.nodemanager.linux-container-executor.group', "item": self.validatorEqualsPropertyItem(properties, "yarn.nodemanager.linux-container-executor.group", clusterEnv, "user_group")},
                             {"config-name": 'yarn.scheduler.maximum-allocation-mb', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'yarn.scheduler.maximum-allocation-mb')} ]
+        yarn_site = properties
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if 'RANGER_KMS' in servicesList and 'KERBEROS' in servicesList:
+            yarn_resource_proxy_enabled = yarn_site['yarn.resourcemanager.proxy-user-privileges.enabled']
+            if yarn_resource_proxy_enabled.lower() == 'true':
+                validationItems.append({"config-name": 'yarn.resourcemanager.proxy-user-privileges.enabled',
+                                        "item": self.getWarnItem(
+                                            "If Ranger KMS service is installed set yarn.resourcemanager.proxy-user-privileges.enabled " \
+                                            "property value as false under yarn-site"
+                                            )})
         return self.toConfigurationValidationProblems(validationItems, "yarn-site")
 
     def validateYARNEnvConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):

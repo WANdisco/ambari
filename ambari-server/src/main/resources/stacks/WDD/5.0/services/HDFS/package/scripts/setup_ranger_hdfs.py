@@ -70,6 +70,7 @@ def setup_ranger_hdfs(upgrade_type=None):
                              component_user_keytab=params.nn_keytab if params.security_enabled else None)
         stack_version = get_stack_version('hadoop-client')
         setup_ranger_plugin_jar_symblink(stack_version, 'hdfs', component_list=['hadoop-client'])
+        setup_ranger_plugin_jar_symblink(stack_version, 'yarn', component_list=['hadoop-client'])
     else:
         from resource_management.libraries.functions.setup_ranger_plugin import setup_ranger_plugin
         setup_ranger_plugin('hadoop-client', 'hdfs', params.previous_jdbc_jar,
@@ -89,6 +90,7 @@ def setup_ranger_hdfs(upgrade_type=None):
                             stack_version_override = stack_version, skip_if_rangeradmin_down= not params.retryAble)
         stack_version = get_stack_version('hadoop-client')
         setup_ranger_plugin_jar_symblink(stack_version, 'hdfs', component_list=['hadoop-client'])
+        setup_ranger_plugin_jar_symblink(stack_version, 'yarn', component_list=['hadoop-client'])
 
     if stack_version and params.upgrade_direction == Direction.UPGRADE:
       # when upgrading to stack remove_ranger_hdfs_plugin_env, this env file must be removed
