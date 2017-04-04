@@ -1,0 +1,14 @@
+{
+  "WDD-5.0": {
+    "latest": {
+      "centos6": "https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0",
+      "centos7": "https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0"
+    },
+    "manifests": {
+      "5.0.0": {
+        "centos6": "file:////var/lib/ambari-server/resources/stacks/WDD/5.0/wdd5.0.0-manifest.xml",
+        "centos7": "file:////var/lib/ambari-server/resources/stacks/WDD/5.0/wdd5.0.0-manifest.xml"
+      }
+    }
+  }
+}

@@ -3,4 +3,6 @@
     <versions>
         <active>true</active>
     </versions>
+    <minJdk>1.7</minJdk>
+    <maxJdk>1.8</maxJdk>
 </metainfo>

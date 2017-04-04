@@ -16,18 +16,19 @@
    limitations under the License.
 -->
 <reposinfo>
+  <latest>/var/lib/ambari-server/resources/stacks/WDD/5.0/wdd.latest.json</latest>
   <os family="redhat6">
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0/</baseurl>
-      <repoid>WDD</repoid>
-      <reponame>WDD-5.0.0</reponame>
+      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0</baseurl>
+      <repoid>WDD-5.0</repoid>
+      <reponame>WDD</reponame>
     </repo>
   </os>
   <os family="redhat7">
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0/</baseurl>
-      <repoid>WDD</repoid>
-      <reponame>WDD-5.0.0</reponame>
+      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0</baseurl>
+      <repoid>WDD-5.0</repoid>
+      <reponame>WDD</reponame>
     </repo>
   </os>
 </reposinfo>
