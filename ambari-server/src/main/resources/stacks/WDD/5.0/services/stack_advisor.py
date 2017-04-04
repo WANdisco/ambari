@@ -1140,12 +1140,6 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         if isLocalRootDir:
             rootDir = re.sub("^file:///|/", "", rootDir, count=1)
             rootDir = "file://" + os.path.join(mountpoints[0], rootDir)
-        tmpDir = re.sub("^file:///|/", "", tmpDir, count=1)
-        if len(mountpoints) > 1 and isLocalRootDir:
-            tmpDir = os.path.join(mountpoints[1], tmpDir)
-        else:
-            tmpDir = os.path.join(mountpoints[0], tmpDir)
-        putAmsHbaseSiteProperty("hbase.tmp.dir", tmpDir)
 
         if operatingMode == "distributed":
             putAmsHbaseSiteProperty("hbase.rootdir", defaultFs + "/user/ams/hbase")

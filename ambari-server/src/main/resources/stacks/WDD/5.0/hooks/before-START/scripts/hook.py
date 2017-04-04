@@ -52,7 +52,9 @@ def create_ranger_hbase_symlinks():
         if params.has_hbase_masters :
             from resource_management.libraries.functions.setup_ranger_plugin_xml import setup_ranger_plugin_jar_symblink
             stack_version = get_stack_version('hadoop-client')
-            setup_ranger_plugin_jar_symblink(stack_version, 'hbase', component_list=['hbase-regionserver'])
+            stack_root = Script.get_stack_root()
+            if(os.path.exists("/usr/wdd/current/hbase-regionserver/lib")) :
+              setup_ranger_plugin_jar_symblink(stack_version, 'hbase', component_list=['hbase-regionserver'])
 
 def create_ranger_hive_symlinks():
     import params
