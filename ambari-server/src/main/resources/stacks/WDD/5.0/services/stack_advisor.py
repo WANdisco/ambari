@@ -1190,6 +1190,9 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                      "yarn-env": self.validateYARNEnvConfigurations},
             "HBASE": {"hbase-env": self.validateHbaseEnvConfigurations},
             "STORM": {"storm-site": self.validateStormConfigurations},
+            "RANGER": {"admin-properties": self.validateRangerAdminConfigurations,
+                       "ranger-env": self.validateRangerConfigurationsEnv,
+                       "ranger-tagsync-site": self.validateRangerTagsyncConfigurations},
             "AMBARI_METRICS": {"ams-hbase-site": self.validateAmsHbaseSiteConfigurations,
                                "ams-hbase-env": self.validateAmsHbaseEnvConfigurations,
                                "ams-site": self.validateAmsSiteConfigurations,
@@ -1747,6 +1750,53 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
     def validateYARNEnvConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
         validationItems = [{"config-name": 'service_check.queue.name', "item": self.validatorYarnQueue(properties, recommendedDefaults, 'service_check.queue.name', services)} ]
         return self.toConfigurationValidationProblems(validationItems, "yarn-env")
+
+    def validateRangerConfigurationsEnv(self, properties, recommendedDefaults, configurations, services, hosts):
+        ranger_env_properties = properties
+        validationItems = []
+        security_enabled = self.isSecurityEnabled(services)
+
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if "ranger-storm-plugin-enabled" in ranger_env_properties and ranger_env_properties[
+            'ranger-storm-plugin-enabled'].lower() == 'yes' and not 'KERBEROS' in servicesList:
+            validationItems.append({"config-name": "ranger-storm-plugin-enabled",
+                                    "item": self.getWarnItem(
+                                        "Ranger Storm plugin should not be enabled in non-kerberos environment.")})
+        if "ranger-kafka-plugin-enabled" in ranger_env_properties and ranger_env_properties[
+            "ranger-kafka-plugin-enabled"].lower() == 'yes' and not security_enabled:
+            validationItems.append({"config-name": "ranger-kafka-plugin-enabled",
+                                    "item": self.getWarnItem(
+                                        "Ranger Kafka plugin should not be enabled in non-kerberos environment.")})
+
+        return self.toConfigurationValidationProblems(validationItems, "ranger-env")
+
+    def validateRangerAdminConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        ranger_site = properties
+        validationItems = []
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if 'RANGER' in servicesList and 'policymgr_external_url' in ranger_site:
+            policymgr_mgr_url = ranger_site['policymgr_external_url']
+            if policymgr_mgr_url.endswith('/'):
+                validationItems.append({'config-name': 'policymgr_external_url',
+                                        'item': self.getWarnItem(
+                                            'Ranger External URL should not contain trailing slash "/"')})
+        return self.toConfigurationValidationProblems(validationItems, 'admin-properties')
+
+    def validateRangerTagsyncConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        ranger_tagsync_properties = properties
+        validationItems = []
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+
+        has_atlas = False
+        if "RANGER" in servicesList:
+            has_atlas = not "ATLAS" in servicesList
+
+            if has_atlas and 'ranger.tagsync.source.atlas' in ranger_tagsync_properties and \
+                            ranger_tagsync_properties['ranger.tagsync.source.atlas'].lower() == 'true':
+                validationItems.append({"config-name": "ranger.tagsync.source.atlas",
+                                        "item": self.getWarnItem("Need to Install ATLAS service to set ranger.tagsync.source.atlas as true.")})
+
+        return self.toConfigurationValidationProblems(validationItems, "ranger-tagsync-site")
 
     def validateHbaseEnvConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
         hbase_site = getSiteProperties(configurations, "hbase-site")
