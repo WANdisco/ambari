@@ -163,8 +163,6 @@ limitations under the License.
     <on-ambari-upgrade add="true"/>
   </property>
 
-
-
   <property>
     <name>hive.server2.enable.doAs</name>
     <value>true</value>
@@ -172,8 +170,30 @@ limitations under the License.
       submitted the query. But if the parameter is set to false, the query will run as the user that the hiveserver2
       process runs as.
     </description>
+    <display-name>Run as end user instead of Hive user</display-name>
+    <value-attributes>
+      <type>value-list</type>
+      <entries>
+        <entry>
+          <value>true</value>
+          <label>True</label>
+        </entry>
+        <entry>
+          <value>false</value>
+          <label>False</label>
+        </entry>
+      </entries>
+      <selection-cardinality>1</selection-cardinality>
+    </value-attributes>
+    <depends-on>
+      <property>
+        <type>hive-env</type>
+        <name>hive_security_authorization</name>
+      </property>
+    </depends-on>
     <on-ambari-upgrade add="true"/>
   </property>
+
   <property>
     <name>hive.server2.enable.impersonation</name>
     <description>Enable user impersonation for HiveServer2</description>
@@ -193,7 +213,6 @@ limitations under the License.
     <on-ambari-upgrade add="true"/>
   </property>
 
-
   <property>
     <name>hive.security.authorization.manager</name>
     <value>org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdConfOnlyAuthorizerFactory</value>
@@ -210,7 +229,7 @@ limitations under the License.
     <on-ambari-upgrade add="true"/>
   </property>
 
-    <property>
+  <property>
     <name>hive.security.authorization.enabled</name>
     <value>false</value>
     <description>enable or disable the Hive client authorization</description>
@@ -270,8 +289,7 @@ limitations under the License.
     <on-ambari-upgrade add="true"/>
   </property>
 
-
-    <property>
+  <property>
     <name>hive.server2.enable.doAs</name>
     <value>true</value>
     <description>
@@ -301,10 +319,6 @@ limitations under the License.
     </depends-on>
     <on-ambari-upgrade add="true"/>
   </property>
-
-
-
-
 
   <property>
     <name>fs.hdfs.impl.disable.cache</name>

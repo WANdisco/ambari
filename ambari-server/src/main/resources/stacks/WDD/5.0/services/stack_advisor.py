@@ -698,18 +698,22 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         containerSize = clusterData['mapMemory'] if clusterData['mapMemory'] > 2048 else int(clusterData['reduceMemory'])
         containerSize = min(clusterData['containers'] * clusterData['ramPerContainer'], containerSize)
         container_size_bytes = int(containerSize)*1024*1024
+
         putHiveEnvProperty = self.putProperty(configurations, "hive-env", services)
-        putHiveProperty = self.putProperty(configurations, "hive-site", services)
-        putHiveProperty('hive.auto.convert.join.noconditionaltask.size', int(round(container_size_bytes / 3)))
-        putHiveProperty('hive.tez.java.opts', "-server -Xmx" + str(int(round((0.8 * containerSize) + 0.5)))
+        putHiveSiteProperty = self.putProperty(configurations, "hive-site", services)
+        putHiveServerProperty = self.putProperty(configurations, "hiveserver2-site", services)
+        putHiveServerPropertyAttribute = self.putPropertyAttribute(configurations, "hiveserver2-site")
+
+        putHiveSiteProperty('hive.auto.convert.join.noconditionaltask.size', int(round(container_size_bytes / 3)))
+        putHiveSiteProperty('hive.tez.java.opts', "-server -Xmx" + str(int(round((0.8 * containerSize) + 0.5)))
                         + "m -Djava.net.preferIPv4Stack=true -XX:NewRatio=8 -XX:+UseNUMA -XX:+UseParallelGC -XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps")
-        putHiveProperty('hive.tez.container.size', containerSize)
+        putHiveSiteProperty('hive.tez.container.size', containerSize)
 
         # javax.jdo.option.ConnectionURL recommendations
         if hiveEnvProperties and self.checkSiteProperties(hiveEnvProperties, 'hive_database', 'hive_database_type'):
             putHiveEnvProperty('hive_database_type', self.getDBTypeAlias(hiveEnvProperties['hive_database']))
         if hiveEnvProperties and hiveSiteProperties and self.checkSiteProperties(hiveSiteProperties, 'javax.jdo.option.ConnectionDriverName') and self.checkSiteProperties(hiveEnvProperties, 'hive_database'):
-            putHiveProperty('javax.jdo.option.ConnectionDriverName', self.getDBDriver(hiveEnvProperties['hive_database']))
+            putHiveSiteProperty('javax.jdo.option.ConnectionDriverName', self.getDBDriver(hiveEnvProperties['hive_database']))
         if hiveSiteProperties and hiveEnvProperties and self.checkSiteProperties(hiveSiteProperties, 'ambari.hive.db.schema.name', 'javax.jdo.option.ConnectionURL') and self.checkSiteProperties(hiveEnvProperties, 'hive_database'):
             hiveServerHost = self.getHostWithComponent('HIVE', 'HIVE_SERVER', services, hosts)
             hiveDBConnectionURL = hiveSiteProperties['javax.jdo.option.ConnectionURL']
@@ -722,7 +726,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             if hiveServerHost is not None:
                 if (hiveDBConnectionURL and "//localhost" in hiveDBConnectionURL) or oldSchemaName or oldDBType or (protocol and hiveDBConnectionURL and not hiveDBConnectionURL.startswith(protocol)):
                     dbConnection = self.getDBConnectionString(hiveEnvProperties['hive_database']).format(hiveServerHost['Hosts']['host_name'], hiveSiteProperties['ambari.hive.db.schema.name'])
-                    putHiveProperty('javax.jdo.option.ConnectionURL', dbConnection)
+                    putHiveSiteProperty('javax.jdo.option.ConnectionURL', dbConnection)
 
         servicesList = self.get_services_list(services)
         if "PIG" in servicesList:
@@ -759,6 +763,102 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             meta = self.get_service_component_meta("HIVE", "WEBHCAT_SERVER", services)
             if "hostnames" in meta:
                 appendCoreSiteProperty('hadoop.proxyuser.HTTP.hosts', meta["hostnames"], updateCallback)
+
+        # Recommend Ranger Hive authorization as per Ranger Hive plugin property
+        if "ranger-env" in services["configurations"] and "hive-env" in services["configurations"] and \
+                        "ranger-hive-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            rangerEnvHivePluginProperty = services["configurations"]["ranger-env"]["properties"][
+                "ranger-hive-plugin-enabled"]
+            if (rangerEnvHivePluginProperty.lower() == "yes"):
+                putHiveEnvProperty("hive_security_authorization", "RANGER")
+
+        # Security
+        if ("configurations" not in services) or ("hive-env" not in services["configurations"]) or \
+                ("properties" not in services["configurations"]["hive-env"]) or \
+                ("hive_security_authorization" not in services["configurations"]["hive-env"]["properties"]) or \
+                        str(services["configurations"]["hive-env"]["properties"][
+                                "hive_security_authorization"]).lower() == "none":
+            putHiveEnvProperty("hive_security_authorization", "None")
+        else:
+            putHiveEnvProperty("hive_security_authorization",
+                               services["configurations"]["hive-env"]["properties"]["hive_security_authorization"])
+
+        # Recommend Ranger Hive authorization as per Ranger Hive plugin property
+        if "ranger-env" in services["configurations"] and "hive-env" in services["configurations"] and \
+                        "ranger-hive-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            rangerEnvHivePluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-hive-plugin-enabled"]
+            rangerEnvHiveAuthProperty = services["configurations"]["hive-env"]["properties"]["hive_security_authorization"]
+            if (rangerEnvHivePluginProperty.lower() == "yes"):
+                putHiveEnvProperty("hive_security_authorization", "Ranger")
+            elif (rangerEnvHiveAuthProperty.lower() == "ranger"):
+                putHiveEnvProperty("hive_security_authorization", "None")
+
+        # hive_security_authorization == 'none'
+        # this property is unrelated to Kerberos
+        if str(configurations["hive-env"]["properties"]["hive_security_authorization"]).lower() == "none":
+            putHiveSiteProperty("hive.security.authorization.manager",
+                                "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdConfOnlyAuthorizerFactory")
+            if ("hive.security.authorization.manager" in configurations["hiveserver2-site"]["properties"]) or \
+                    ("hiveserver2-site" not in services["configurations"]) or \
+                    ("hiveserver2-site" in services["configurations"] and "hive.security.authorization.manager" in
+                        services["configurations"]["hiveserver2-site"]["properties"]):
+                putHiveServerPropertyAttribute("hive.security.authorization.manager", "delete", "true")
+            if ("hive.security.authenticator.manager" in configurations["hiveserver2-site"]["properties"]) or \
+                    ("hiveserver2-site" not in services["configurations"]) or \
+                    ("hiveserver2-site" in services["configurations"] and "hive.security.authenticator.manager" in
+                        services["configurations"]["hiveserver2-site"]["properties"]):
+                putHiveServerPropertyAttribute("hive.security.authenticator.manager", "delete", "true")
+            if ("hive.conf.restricted.list" in configurations["hiveserver2-site"]["properties"]) or \
+                    ("hiveserver2-site" not in services["configurations"]) or \
+                    ("hiveserver2-site" in services["configurations"] and "hive.conf.restricted.list" in
+                        services["configurations"]["hiveserver2-site"]["properties"]):
+                putHiveServerPropertyAttribute("hive.conf.restricted.list", "delete", "true")
+            if "KERBEROS" not in servicesList:  # Kerberos security depends on this property
+                putHiveSiteProperty("hive.security.authorization.enabled", "false")
+        else:
+            putHiveSiteProperty("hive.security.authorization.enabled", "true")
+
+        try:
+            auth_manager_value = str(
+                configurations["hive-env"]["properties"]["hive.security.metastore.authorization.manager"])
+        except KeyError:
+            auth_manager_value = 'org.apache.hadoop.hive.ql.security.authorization.StorageBasedAuthorizationProvider'
+            pass
+        auth_manager_values = auth_manager_value.split(",")
+        sqlstdauth_class = "org.apache.hadoop.hive.ql.security.authorization.MetaStoreAuthzAPIAuthorizerEmbedOnly"
+        putHiveSiteProperty("hive.server2.enable.doAs", "true")
+
+        # hive_security_authorization == 'sqlstdauth'
+        if str(configurations["hive-env"]["properties"]["hive_security_authorization"]).lower() == "sqlstdauth":
+            putHiveSiteProperty("hive.server2.enable.doAs", "false")
+            putHiveServerProperty("hive.security.authorization.enabled", "true")
+            putHiveServerProperty("hive.security.authorization.manager", "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory")
+            putHiveServerProperty("hive.security.authenticator.manager",
+                                      "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator")
+            putHiveServerProperty("hive.conf.restricted.list",
+                                      "hive.security.authenticator.manager,hive.security.authorization.manager,hive.users.in.admin.role")
+            putHiveSiteProperty("hive.security.authorization.manager",
+                                    "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdConfOnlyAuthorizerFactory")
+            if sqlstdauth_class not in auth_manager_values:
+                auth_manager_values.append(sqlstdauth_class)
+        elif sqlstdauth_class in auth_manager_values:
+            # remove item from csv
+            auth_manager_values = [x for x in auth_manager_values if x != sqlstdauth_class]
+            pass
+        putHiveSiteProperty("hive.security.metastore.authorization.manager", ",".join(auth_manager_values))
+
+        # hive_security_authorization == 'ranger'
+        if str(configurations["hive-env"]["properties"]["hive_security_authorization"]).lower() == "ranger":
+            putHiveSiteProperty("hive.server2.enable.doAs", "false")
+            putHiveServerProperty("hive.security.authorization.enabled", "true")
+            putHiveServerProperty("hive.security.authorization.manager", "com.xasecure.authorization.hive.authorizer.XaSecureHiveAuthorizerFactory")
+            putHiveServerProperty("hive.security.authenticator.manager", "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator")
+            putHiveServerProperty("hive.conf.restricted.list", "hive.security.authorization.enabled,hive.security.authorization.manager,hive.security.authenticator.manager")
+
+        # hive_security_authorization == 'ranger'
+        if str(configurations["hive-env"]["properties"]["hive_security_authorization"]).lower() == "ranger":
+            putHiveServerProperty("hive.security.authorization.manager",
+                                  "org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory")
 
 
     def getAmsMemoryRecommendation(self, services, hosts):
@@ -1188,6 +1288,10 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             "MAPREDUCE2": {"mapred-site": self.validateMapReduce2Configurations},
             "YARN": {"yarn-site": self.validateYARNConfigurations,
                      "yarn-env": self.validateYARNEnvConfigurations},
+            "HIVE": {"hiveserver2-site": self.validateHiveServer2Configurations,
+                     "hive-site": self.validateHiveConfigurations,
+                     "hive-env": self.validateHiveConfigurationsEnv,
+                     "webhcat-site": self.validateWebhcatConfigurations},
             "HBASE": {"hbase-env": self.validateHbaseEnvConfigurations},
             "STORM": {"storm-site": self.validateStormConfigurations},
             "RANGER": {"admin-properties": self.validateRangerAdminConfigurations,
@@ -1797,6 +1901,131 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                                         "item": self.getWarnItem("Need to Install ATLAS service to set ranger.tagsync.source.atlas as true.")})
 
         return self.toConfigurationValidationProblems(validationItems, "ranger-tagsync-site")
+
+
+    def validateHiveServer2Configurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        hive_server2 = properties
+        validationItems = []
+        # Adding Ranger Plugin logic here
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-hive-plugin-properties")
+        hive_env_properties = getSiteProperties(configurations, "hive-env")
+        ranger_plugin_enabled = 'hive_security_authorization' in hive_env_properties and hive_env_properties[
+                                                                                             'hive_security_authorization'].lower() == 'ranger'
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+
+        ##Add stack validations only if Ranger is enabled.
+        if ("RANGER" in servicesList):
+            ##Add stack validations for  Ranger plugin enabled.
+            if ranger_plugin_enabled:
+                prop_name = 'hive.security.authorization.manager'
+                prop_val = "org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory"
+                if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
+                    validationItems.append({"config-name": prop_name,
+                                            "item": self.getWarnItem(
+                                                "If Ranger Hive Plugin is enabled." \
+                                                " {0} under hiveserver2-site needs to be set to {1}".format(prop_name,
+                                                                                                            prop_val))})
+                prop_name = 'hive.security.authenticator.manager'
+                prop_val = "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator"
+                if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
+                    validationItems.append({"config-name": prop_name,
+                                            "item": self.getWarnItem(
+                                                "If Ranger Hive Plugin is enabled." \
+                                                " {0} under hiveserver2-site needs to be set to {1}".format(prop_name,
+                                                                                                            prop_val))})
+                prop_name = 'hive.security.authorization.enabled'
+                prop_val = 'true'
+                if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
+                    validationItems.append({"config-name": prop_name,
+                                            "item": self.getWarnItem(
+                                                "If Ranger Hive Plugin is enabled." \
+                                                " {0} under hiveserver2-site needs to be set to {1}".format(prop_name,
+                                                                                                            prop_val))})
+                prop_name = 'hive.conf.restricted.list'
+                prop_vals = 'hive.security.authorization.enabled,hive.security.authorization.manager,hive.security.authenticator.manager'.split(
+                    ',')
+                current_vals = []
+                missing_vals = []
+                if hive_server2 and prop_name in hive_server2:
+                    current_vals = hive_server2[prop_name].split(',')
+                    current_vals = [x.strip() for x in current_vals]
+
+                for val in prop_vals:
+                    if not val in current_vals:
+                        missing_vals.append(val)
+
+                if missing_vals:
+                    validationItems.append({"config-name": prop_name,
+                                            "item": self.getWarnItem("If Ranger Hive Plugin is enabled." \
+                                                                     " {0} under hiveserver2-site needs to contain missing value {1}".format(
+                                                prop_name, ','.join(missing_vals)))})
+            ##Add stack validations for  Ranger plugin disabled.
+            elif not ranger_plugin_enabled:
+                prop_name = 'hive.security.authorization.manager'
+                prop_val = "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory"
+                if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
+                    validationItems.append({"config-name": prop_name,
+                                            "item": self.getWarnItem(
+                                                "If Ranger Hive Plugin is disabled." \
+                                                " {0} needs to be set to {1}".format(prop_name, prop_val))})
+                prop_name = 'hive.security.authenticator.manager'
+                prop_val = "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator"
+                if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
+                    validationItems.append({"config-name": prop_name,
+                                            "item": self.getWarnItem(
+                                                "If Ranger Hive Plugin is disabled." \
+                                                " {0} needs to be set to {1}".format(prop_name, prop_val))})
+        return self.toConfigurationValidationProblems(validationItems, "hiveserver2-site")
+
+    def validateWebhcatConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = [{"config-name": 'templeton.hadoop.queue.name',
+                            "item": self.validatorYarnQueue(properties, recommendedDefaults,
+                                                            'templeton.hadoop.queue.name', services)}]
+        return self.toConfigurationValidationProblems(validationItems, "webhcat-site")
+
+    def validateHiveConfigurationsEnv(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = []
+        hive_env = properties
+        hive_site = getSiteProperties(configurations, "hive-site")
+        if "hive_security_authorization" in hive_env and \
+                        str(hive_env["hive_security_authorization"]).lower() == "none" \
+                and str(hive_site["hive.security.authorization.enabled"]).lower() == "true":
+            authorization_item = self.getErrorItem("hive_security_authorization should not be None "
+                                                   "if hive.security.authorization.enabled is set")
+            validationItems.append({"config-name": "hive_security_authorization", "item": authorization_item})
+        if "hive_security_authorization" in hive_env and \
+                        str(hive_env["hive_security_authorization"]).lower() == "ranger":
+            # ranger-hive-plugin must be enabled in ranger-env
+            ranger_env = getServicesSiteProperties(services, 'ranger-env')
+            if not ranger_env or not 'ranger-hive-plugin-enabled' in ranger_env or \
+                            ranger_env['ranger-hive-plugin-enabled'].lower() != 'yes':
+                validationItems.append({"config-name": 'hive_security_authorization',
+                                        "item": self.getWarnItem(
+                                            "ranger-env/ranger-hive-plugin-enabled must be enabled when hive_security_authorization is set to Ranger")})
+        return self.toConfigurationValidationProblems(validationItems, "hive-env")
+
+    def validateHiveConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        hive_site = properties
+        validationItems = []
+        stripe_size_values = [8388608, 16777216, 33554432, 67108864, 134217728, 268435456]
+        stripe_size_property = "hive.exec.orc.default.stripe.size"
+        if stripe_size_property in properties and \
+                        int(properties[stripe_size_property]) not in stripe_size_values:
+            validationItems.append({"config-name": stripe_size_property,
+                                    "item": self.getWarnItem("Correct values are {0}".format(stripe_size_values))
+                                    }
+                                   )
+        authentication_property = "hive.server2.authentication"
+        ldap_baseDN_property = "hive.server2.authentication.ldap.baseDN"
+        ldap_domain_property = "hive.server2.authentication.ldap.Domain"
+        if authentication_property in properties and properties[authentication_property].lower() == "ldap" \
+                and not (ldap_baseDN_property in properties or ldap_domain_property in properties):
+            validationItems.append({"config-name": authentication_property, "item":
+                self.getWarnItem("According to LDAP value for " + authentication_property + ", you should add " +
+                                 ldap_domain_property + " property, if you are using AD, if not, then " + ldap_baseDN_property + "!")})
+
+        configurationValidationProblems = self.toConfigurationValidationProblems(validationItems, "hive-site")
+        return configurationValidationProblems
 
     def validateHbaseEnvConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
         hbase_site = getSiteProperties(configurations, "hbase-site")
