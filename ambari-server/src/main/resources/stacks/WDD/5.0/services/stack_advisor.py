@@ -494,6 +494,68 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 and services['configurations']['hbase-env']['properties']['hbase_user'] != services['configurations']['hbase-site']['properties']['hbase.superuser']:
             putHbaseSiteProperty("hbase.superuser", services['configurations']['hbase-env']['properties']['hbase_user'])
 
+        if "ranger-env" in services["configurations"] and "ranger-hbase-plugin-properties" in services["configurations"] and \
+                        "ranger-hbase-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            putHbaseRangerPluginProperty = self.putProperty(configurations, "ranger-hbase-plugin-properties", services)
+            rangerEnvHbasePluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-hbase-plugin-enabled"]
+            putHbaseRangerPluginProperty("ranger-hbase-plugin-enabled", rangerEnvHbasePluginProperty)
+            if "cluster-env" in services["configurations"] and "smokeuser" in services["configurations"]["cluster-env"][
+                "properties"]:
+                smoke_user = services["configurations"]["cluster-env"]["properties"]["smokeuser"]
+                putHbaseRangerPluginProperty("policy_user", smoke_user)
+        rangerPluginEnabled = ''
+        if 'ranger-hbase-plugin-properties' in configurations and 'ranger-hbase-plugin-enabled' in \
+                configurations['ranger-hbase-plugin-properties']['properties']:
+            rangerPluginEnabled = configurations['ranger-hbase-plugin-properties']['properties']['ranger-hbase-plugin-enabled']
+        elif 'ranger-hbase-plugin-properties' in services['configurations'] and 'ranger-hbase-plugin-enabled' in \
+                services['configurations']['ranger-hbase-plugin-properties']['properties']:
+            rangerPluginEnabled = services['configurations']['ranger-hbase-plugin-properties']['properties']['ranger-hbase-plugin-enabled']
+
+        if rangerPluginEnabled and rangerPluginEnabled.lower() == 'Yes'.lower():
+            putHbaseSiteProperty('hbase.security.authorization', 'true')
+
+        # Authorization
+        hbaseCoProcessorConfigs = {
+            'hbase.coprocessor.region.classes': [],
+            'hbase.coprocessor.regionserver.classes': [],
+            'hbase.coprocessor.master.classes': []
+        }
+
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        rangerServiceVersion = ''
+        if 'RANGER' in servicesList:
+            rangerServiceVersion = [service['StackServices']['service_version'] for service in services["services"] if
+                                    service['StackServices']['service_name'] == 'RANGER'][0]
+
+        rangerClass = 'org.apache.ranger.authorization.hbase.RangerAuthorizationCoprocessor'
+
+        nonRangerClass = 'org.apache.hadoop.hbase.security.access.AccessController'
+        hbaseClassConfigs = hbaseCoProcessorConfigs.keys()
+
+        for item in range(len(hbaseClassConfigs)):
+            if 'hbase-site' in services['configurations']:
+                if hbaseClassConfigs[item] in services['configurations']['hbase-site']['properties']:
+                    if 'hbase-site' in configurations and hbaseClassConfigs[item] in configurations['hbase-site'][
+                        'properties']:
+                        coprocessorConfig = configurations['hbase-site']['properties'][hbaseClassConfigs[item]]
+                    else:
+                        coprocessorConfig = services['configurations']['hbase-site']['properties'][hbaseClassConfigs[item]]
+                    coprocessorClasses = coprocessorConfig.split(",")
+                    coprocessorClasses = filter(None, coprocessorClasses)  # Removes empty string elements from array
+                    if rangerPluginEnabled and rangerPluginEnabled.lower() == 'Yes'.lower():
+                        if nonRangerClass in coprocessorClasses:
+                            coprocessorClasses.remove(nonRangerClass)
+                        if not rangerClass in coprocessorClasses:
+                            coprocessorClasses.append(rangerClass)
+                        putHbaseSiteProperty(hbaseClassConfigs[item], ','.join(coprocessorClasses))
+                    elif rangerPluginEnabled and rangerPluginEnabled.lower() == 'No'.lower():
+                        if rangerClass in coprocessorClasses:
+                            coprocessorClasses.remove(rangerClass)
+                            if not nonRangerClass in coprocessorClasses:
+                                coprocessorClasses.append(nonRangerClass)
+                            putHbaseSiteProperty(hbaseClassConfigs[item], ','.join(coprocessorClasses))
+                elif rangerPluginEnabled and rangerPluginEnabled.lower() == 'Yes'.lower():
+                    putHbaseSiteProperty(hbaseClassConfigs[item], rangerClass)
 
     def recommendRangerConfigurations(self, configurations, clusterData, services, hosts):
 
@@ -1691,6 +1753,34 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         validationItems = [ {"config-name": 'hbase_regionserver_heapsize', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'hbase_regionserver_heapsize')},
                             {"config-name": 'hbase_master_heapsize', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'hbase_master_heapsize')},
                             {"config-name": "hbase_user", "item": self.validatorEqualsPropertyItem(properties, "hbase_user", hbase_site, "hbase.superuser")} ]
+        # Adding Ranger Plugin logic here
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-hbase-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-hbase-plugin-enabled'] if ranger_plugin_properties else 'No'
+        prop_name = 'hbase.security.authorization'
+        prop_val = "true"
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if ("RANGER" in servicesList) and (ranger_plugin_enabled.lower() == 'Yes'.lower()):
+            if hbase_site[prop_name] != prop_val:
+                validationItems.append({"config-name": prop_name,
+                                        "item": self.getWarnItem("If Ranger HBase Plugin is enabled." \
+                                            "{0} needs to be set to {1}".format(prop_name, prop_val))})
+            prop_name = "hbase.coprocessor.master.classes"
+            prop_val = "org.apache.ranger.authorization.hbase.RangerAuthorizationCoprocessor"
+            exclude_val = "org.apache.hadoop.hbase.security.access.AccessController"
+            if (prop_val in hbase_site[prop_name] and exclude_val not in hbase_site[prop_name]):
+                pass
+            else:
+                validationItems.append({"config-name": prop_name,"item": self.getWarnItem("If Ranger HBase Plugin is enabled." \
+                                            " {0} needs to contain {1} instead of {2}".format(prop_name, prop_val, exclude_val))})
+            prop_name = "hbase.coprocessor.region.classes"
+            prop_val = "org.apache.ranger.authorization.hbase.RangerAuthorizationCoprocessor"
+            if (prop_val in hbase_site[prop_name] and exclude_val not in hbase_site[prop_name]):
+                pass
+            else:
+                validationItems.append({"config-name": prop_name,
+                                        "item": self.getWarnItem("If Ranger HBase Plugin is enabled." \
+                                            " {0} needs to contain {1} instead of {2}".format(prop_name, prop_val, exclude_val))})
+
         return self.toConfigurationValidationProblems(validationItems, "hbase-env")
 
     def validateHDFSConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):

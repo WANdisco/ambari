@@ -30,6 +30,7 @@ def setup_hadoop_env():
              owner=tc_owner,
              content=InlineTemplate(params.hadoop_env_sh_template)
              )
+    create_ranger_hbase_symlinks()
 
 
 def create_javahome_symlink():
@@ -41,6 +42,15 @@ def create_javahome_symlink():
              to="/usr/jdk64/jdk1.6.0_31",
              )
 
+def create_ranger_hbase_symlinks():
+    import params
+    ranger_admin_hosts = default("/clusterHostInfo/ranger_admin_hosts", [])
+    has_ranger_admin = not len(ranger_admin_hosts) == 0
+    if has_ranger_admin:
+        if params.has_hbase_masters :
+            from resource_management.libraries.functions.setup_ranger_plugin_xml import setup_ranger_plugin_jar_symblink
+            stack_version = get_stack_version('hadoop-client')
+            setup_ranger_plugin_jar_symblink(stack_version, 'hbase', component_list=['hbase-regionserver'])
 
 class BeforeStartHook(Hook):
     def hook(self, env):

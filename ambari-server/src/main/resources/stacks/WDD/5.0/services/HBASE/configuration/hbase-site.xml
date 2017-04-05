@@ -184,7 +184,7 @@
         <name>hbase.security.authorization</name>
       </property>
     </depends-on>
-    <on-ambari-upgrade add="false"/>
+    <on-ambari-upgrade add="true"/>
   </property>
   <property>
     <name>hbase.hstore.compaction.max</name>
