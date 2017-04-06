@@ -53,7 +53,11 @@ class BeforeInstallHook(Hook):
     Logger.info("In stack upgrade: {0}".format(Script.in_stack_upgrade()))
     Logger.info("Hadoop conf dir is: {0}".format(conf_select.get_hadoop_conf_dir()))
 
-
+    #create symlink to default tez in order to support hive llap functionality
+    Link("/etc/tez_hive2",
+     to="/etc/tez",
+     not_if="ls /etc/tez_hive2"
+     )
 
 if __name__ == "__main__":
   BeforeInstallHook().execute()

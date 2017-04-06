@@ -35,7 +35,8 @@ def setup_nsn_distro():
         "ranger-knox-plugin": "ranger/ranger-knox-plugin",
         "ranger-solr-plugin": "ranger/ranger-solr-plugin",
         "ranger-storm-plugin": "ranger/ranger-storm-plugin",
-        "ranger-yarn-plugin": "ranger/ranger-yarn-plugin"
+        "ranger-yarn-plugin": "ranger/ranger-yarn-plugin",
+        "tez_hive2": "tez"
     }
 
     nsn_components = ["tez", "hadoop", "zookeeper", "hbase", "hive", "slider", "sqoop", "spark", "storm", "ranger"]
