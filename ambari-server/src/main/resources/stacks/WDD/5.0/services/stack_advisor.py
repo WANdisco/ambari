@@ -85,6 +85,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             "STORM": self.recommendStormConfigurations,
             "AMBARI_METRICS": self.recommendAmsConfigurations,
             "RANGER": self.recommendRangerConfigurations,
+            "RANGER_KMS": self.recommendRangerKMSConfigurations,
             "HIVE": self.recommendHiveConfigurations,
         }
 
@@ -614,24 +615,15 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             putRangerAdminProperty('policymgr_external_url', policymgr_external_url)
 
         ranger_plugins_serviceuser = [
-            {'service_name': 'HDFS', 'file_name': 'hadoop-env', 'config_name': 'hdfs_user',
-             'target_configname': 'ranger.plugins.hdfs.serviceuser'},
-            {'service_name': 'HIVE', 'file_name': 'hive-env', 'config_name': 'hive_user',
-             'target_configname': 'ranger.plugins.hive.serviceuser'},
-            {'service_name': 'YARN', 'file_name': 'yarn-env', 'config_name': 'yarn_user',
-             'target_configname': 'ranger.plugins.yarn.serviceuser'},
-            {'service_name': 'HBASE', 'file_name': 'hbase-env', 'config_name': 'hbase_user',
-             'target_configname': 'ranger.plugins.hbase.serviceuser'},
-            {'service_name': 'KNOX', 'file_name': 'knox-env', 'config_name': 'knox_user',
-             'target_configname': 'ranger.plugins.knox.serviceuser'},
-            {'service_name': 'STORM', 'file_name': 'storm-env', 'config_name': 'storm_user',
-             'target_configname': 'ranger.plugins.storm.serviceuser'},
-            {'service_name': 'KAFKA', 'file_name': 'kafka-env', 'config_name': 'kafka_user',
-             'target_configname': 'ranger.plugins.kafka.serviceuser'},
-            {'service_name': 'RANGER_KMS', 'file_name': 'kms-env', 'config_name': 'kms_user',
-             'target_configname': 'ranger.plugins.kms.serviceuser'},
-            {'service_name': 'ATLAS', 'file_name': 'atlas-env', 'config_name': 'metadata_user',
-             'target_configname': 'ranger.plugins.atlas.serviceuser'}
+            {'service_name': 'HDFS', 'file_name': 'hadoop-env', 'config_name': 'hdfs_user', 'target_configname': 'ranger.plugins.hdfs.serviceuser'},
+            {'service_name': 'HIVE', 'file_name': 'hive-env', 'config_name': 'hive_user', 'target_configname': 'ranger.plugins.hive.serviceuser'},
+            {'service_name': 'YARN', 'file_name': 'yarn-env', 'config_name': 'yarn_user', 'target_configname': 'ranger.plugins.yarn.serviceuser'},
+            {'service_name': 'HBASE', 'file_name': 'hbase-env', 'config_name': 'hbase_user', 'target_configname': 'ranger.plugins.hbase.serviceuser'},
+            {'service_name': 'KNOX', 'file_name': 'knox-env', 'config_name': 'knox_user', 'target_configname': 'ranger.plugins.knox.serviceuser'},
+            {'service_name': 'STORM', 'file_name': 'storm-env', 'config_name': 'storm_user', 'target_configname': 'ranger.plugins.storm.serviceuser'},
+            {'service_name': 'KAFKA', 'file_name': 'kafka-env', 'config_name': 'kafka_user', 'target_configname': 'ranger.plugins.kafka.serviceuser'},
+            {'service_name': 'RANGER_KMS', 'file_name': 'kms-env', 'config_name': 'kms_user', 'target_configname': 'ranger.plugins.kms.serviceuser'},
+            {'service_name': 'ATLAS', 'file_name': 'atlas-env', 'config_name': 'metadata_user', 'target_configname': 'ranger.plugins.atlas.serviceuser'}
         ]
 
         for item in range(len(ranger_plugins_serviceuser)):
@@ -658,6 +650,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             {'service_name': 'HIVE', 'audit_file': 'ranger-hive-audit'},
             {'service_name': 'KNOX', 'audit_file': 'ranger-knox-audit'},
             {'service_name': 'KAFKA', 'audit_file': 'ranger-kafka-audit'},
+            {'service_name': 'RANGER_KMS', 'audit_file': 'ranger-kms-audit'},
             {'service_name': 'STORM', 'audit_file': 'ranger-storm-audit'}
         ]
 
@@ -666,18 +659,12 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 component_audit_file = ranger_services[item]['audit_file']
                 if component_audit_file in services["configurations"]:
                     ranger_audit_dict = [
-                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.db',
-                         'target_configname': 'xasecure.audit.destination.db'},
-                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs',
-                         'target_configname': 'xasecure.audit.destination.hdfs'},
-                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs.dir',
-                         'target_configname': 'xasecure.audit.destination.hdfs.dir'},
-                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.solr',
-                         'target_configname': 'xasecure.audit.destination.solr'},
-                        {'filename': 'ranger-admin-site', 'configname': 'ranger.audit.solr.urls',
-                         'target_configname': 'xasecure.audit.destination.solr.urls'},
-                        {'filename': 'ranger-admin-site', 'configname': 'ranger.audit.solr.zookeepers',
-                         'target_configname': 'xasecure.audit.destination.solr.zookeepers'}
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.db', 'target_configname': 'xasecure.audit.destination.db'},
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs', 'target_configname': 'xasecure.audit.destination.hdfs'},
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.hdfs.dir', 'target_configname': 'xasecure.audit.destination.hdfs.dir'},
+                        {'filename': 'ranger-env', 'configname': 'xasecure.audit.destination.solr', 'target_configname': 'xasecure.audit.destination.solr'},
+                        {'filename': 'ranger-admin-site', 'configname': 'ranger.audit.solr.urls', 'target_configname': 'xasecure.audit.destination.solr.urls'},
+                        {'filename': 'ranger-admin-site', 'configname': 'ranger.audit.solr.zookeepers', 'target_configname': 'xasecure.audit.destination.solr.zookeepers'}
                     ]
                     putRangerAuditProperty = self.putProperty(configurations, component_audit_file, services)
 
@@ -688,9 +675,121 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                                     configurations[item['filename']]["properties"]:
                                 rangerAuditProperty = configurations[item['filename']]["properties"][item['configname']]
                             else:
-                                rangerAuditProperty = services["configurations"][item['filename']]["properties"][
-                                    item['configname']]
+                                rangerAuditProperty = services["configurations"][item['filename']]["properties"][item['configname']]
                             putRangerAuditProperty(item['target_configname'], rangerAuditProperty)
+
+        if "HDFS" in servicesList:
+            hdfs_user = None
+            if "hadoop-env" in services["configurations"] and "hdfs_user" in services["configurations"]["hadoop-env"]["properties"]:
+                hdfs_user = services["configurations"]["hadoop-env"]["properties"]["hdfs_user"]
+                putRangerAdminProperty('ranger.kms.service.user.hdfs', hdfs_user)
+
+        if "HIVE" in servicesList:
+            hive_user = None
+            if "hive-env" in services["configurations"] and "hive_user" in services["configurations"]["hive-env"]["properties"]:
+                hive_user = services["configurations"]["hive-env"]["properties"]["hive_user"]
+                putRangerAdminProperty('ranger.kms.service.user.hive', hive_user)
+
+        for item in range(len(ranger_plugins_serviceuser)):
+            if ranger_plugins_serviceuser[item]['service_name'] in servicesList:
+                file_name = ranger_plugins_serviceuser[item]['file_name']
+                config_name = ranger_plugins_serviceuser[item]['config_name']
+                target_configname = ranger_plugins_serviceuser[item]['target_configname']
+                if file_name in services["configurations"] and config_name in services["configurations"][file_name]["properties"]:
+                    service_user = services["configurations"][file_name]["properties"][config_name]
+                    putRangerAdminProperty(target_configname, service_user)
+
+    def recommendRangerKMSConfigurations(self, configurations, clusterData, services, hosts):
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        putRangerKmsDbksProperty = self.putProperty(configurations, "dbks-site", services)
+        putRangerKmsProperty = self.putProperty(configurations, "kms-properties", services)
+        putRangerKmsSiteProperty = self.putProperty(configurations, "kms-site", services)
+        kmsEnvProperties = getSiteProperties(services['configurations'], 'kms-env')
+        putCoreSiteProperty = self.putProperty(configurations, "core-site", services)
+        putCoreSitePropertyAttribute = self.putPropertyAttribute(configurations, "core-site")
+        putRangerKmsAuditProperty = self.putProperty(configurations, "ranger-kms-audit", services)
+
+        if 'kms-properties' in services['configurations'] and (
+            'DB_FLAVOR' in services['configurations']['kms-properties']['properties']):
+
+            rangerKmsDbFlavor = services['configurations']["kms-properties"]["properties"]["DB_FLAVOR"]
+
+            if ('db_host' in services['configurations']['kms-properties']['properties']) and (
+                'db_name' in services['configurations']['kms-properties']['properties']):
+
+                rangerKmsDbHost = services['configurations']["kms-properties"]["properties"]["db_host"]
+                rangerKmsDbName = services['configurations']["kms-properties"]["properties"]["db_name"]
+
+                ranger_kms_db_url_dict = {
+                    'MYSQL': {'ranger.ks.jpa.jdbc.driver': 'com.mysql.jdbc.Driver',
+                              'ranger.ks.jpa.jdbc.url': 'jdbc:mysql://' + self.getDBConnectionHostPort(rangerKmsDbFlavor, rangerKmsDbHost) + '/' + rangerKmsDbName},
+                    'ORACLE': {'ranger.ks.jpa.jdbc.driver': 'oracle.jdbc.driver.OracleDriver',
+                               'ranger.ks.jpa.jdbc.url': 'jdbc:oracle:thin:@' + self.getOracleDBConnectionHostPort(rangerKmsDbFlavor, rangerKmsDbHost, rangerKmsDbName)},
+                    'POSTGRES': {'ranger.ks.jpa.jdbc.driver': 'org.postgresql.Driver',
+                                 'ranger.ks.jpa.jdbc.url': 'jdbc:postgresql://' + self.getDBConnectionHostPort(rangerKmsDbFlavor, rangerKmsDbHost) + '/' + rangerKmsDbName},
+                    'MSSQL': {'ranger.ks.jpa.jdbc.driver': 'com.microsoft.sqlserver.jdbc.SQLServerDriver',
+                              'ranger.ks.jpa.jdbc.url': 'jdbc:sqlserver://' + self.getDBConnectionHostPort(rangerKmsDbFlavor, rangerKmsDbHost) + ';databaseName=' + rangerKmsDbName},
+                    'SQLA': {'ranger.ks.jpa.jdbc.driver': 'sap.jdbc4.sqlanywhere.IDriver',
+                             'ranger.ks.jpa.jdbc.url': 'jdbc:sqlanywhere:host=' + self.getDBConnectionHostPort(rangerKmsDbFlavor, rangerKmsDbHost) + ';database=' + rangerKmsDbName}
+                }
+
+                rangerKmsDbProperties = ranger_kms_db_url_dict.get(rangerKmsDbFlavor, ranger_kms_db_url_dict['MYSQL'])
+                for key in rangerKmsDbProperties:
+                    putRangerKmsDbksProperty(key, rangerKmsDbProperties.get(key))
+
+        if kmsEnvProperties and self.checkSiteProperties(kmsEnvProperties, 'kms_user') and 'KERBEROS' in servicesList:
+            kmsUser = kmsEnvProperties['kms_user']
+            kmsUserOld = self.getOldValue(self, services, 'kms-env', 'kms_user')
+            putCoreSiteProperty('hadoop.proxyuser.{0}.groups'.format(kmsUser), '*')
+            if kmsUserOld is not None and kmsUser != kmsUserOld:
+                putCoreSitePropertyAttribute("hadoop.proxyuser.{0}.groups".format(kmsUserOld), 'delete', 'true')
+                services["forced-configurations"].append({"type": "core-site", "name": "hadoop.proxyuser.{0}.groups".format(kmsUserOld)})
+                services["forced-configurations"].append({"type": "core-site", "name": "hadoop.proxyuser.{0}.groups".format(kmsUser)})
+
+        if "HDFS" in servicesList:
+            if 'core-site' in services['configurations'] and (
+                'fs.defaultFS' in services['configurations']['core-site']['properties']):
+                default_fs = services['configurations']['core-site']['properties']['fs.defaultFS']
+                putRangerKmsAuditProperty('xasecure.audit.destination.hdfs.dir',
+                                          '{0}/{1}/{2}'.format(default_fs, 'ranger', 'audit'))
+
+        #from stack 2.5
+        if 'ranger-env' in services['configurations'] and 'ranger_user' in services['configurations']['ranger-env']['properties']:
+            rangerUser = services['configurations']['ranger-env']['properties']['ranger_user']
+
+            if 'kms-site' in services['configurations'] and 'KERBEROS' in servicesList:
+                putRangerKmsSiteProperty('hadoop.kms.proxyuser.{0}.groups'.format(rangerUser), '*')
+                putRangerKmsSiteProperty('hadoop.kms.proxyuser.{0}.hosts'.format(rangerUser), '*')
+                putRangerKmsSiteProperty('hadoop.kms.proxyuser.{0}.users'.format(rangerUser), '*')
+
+    def getOracleDBConnectionHostPort(self, db_type, db_host, rangerDbName):
+        connection_string = self.getDBConnectionHostPort(db_type, db_host)
+        colon_count = db_host.count(':')
+        if colon_count == 1 and '/' in db_host:
+            connection_string = "//" + connection_string
+        elif colon_count == 0 or colon_count == 1:
+            connection_string = "//" + connection_string + "/" + rangerDbName if rangerDbName else "//" + connection_string
+
+        return connection_string
+
+    def getDBConnectionHostPort(self, db_type, db_host):
+        DB_TYPE_DEFAULT_PORT_MAP = {"MYSQL": "3306", "ORACLE": "1521", "POSTGRES": "5432", "MSSQL": "1433", "SQLA": "2638"}
+        connection_string = ""
+        if db_type is None or db_type == "":
+            return connection_string
+        else:
+            colon_count = db_host.count(':')
+            if colon_count == 0:
+                if DB_TYPE_DEFAULT_PORT_MAP.has_key(db_type):
+                    connection_string = db_host + ":" + DB_TYPE_DEFAULT_PORT_MAP[db_type]
+                else:
+                    connection_string = db_host
+            elif colon_count == 1:
+                connection_string = db_host
+            elif colon_count == 2:
+                connection_string = db_host
+
+        return connection_string
 
     def recommendHiveConfigurations(self, configurations, clusterData, services, hosts):
         hiveSiteProperties = getSiteProperties(services['configurations'], 'hive-site')
