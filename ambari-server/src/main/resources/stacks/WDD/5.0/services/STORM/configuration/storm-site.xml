@@ -79,4 +79,15 @@
     <deleted>true</deleted>
     <on-ambari-upgrade add="false"/>
   </property>
+  <property>
+    <name>nimbus.authorizer</name>
+    <description>Log directory for Storm.</description>
+    <depends-on>
+      <property>
+        <type>ranger-storm-plugin-properties</type>
+        <name>ranger-storm-plugin-enabled</name>
+      </property>
+    </depends-on>
+    <on-ambari-upgrade add="true"/>
+  </property>
 </configuration>

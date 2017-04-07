@@ -11,6 +11,7 @@ from math import ceil, floor
 
 from resource_management.core.logger import Logger
 from resource_management.libraries.functions.mounted_dirs_helper import get_mounts_with_multiple_data_dirs
+from resource_management.libraries.functions.get_bare_principal import get_bare_principal
 
 from stack_advisor import DefaultStackAdvisor
 
@@ -1011,10 +1012,64 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
     def recommendStormConfigurations(self, configurations, clusterData, services, hosts):
         putStormSiteProperty = self.putProperty(configurations, "storm-site", services)
+        putStormSiteAttributes = self.putPropertyAttribute(configurations, "storm-site")
         servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
         # Storm AMS integration
         if 'AMBARI_METRICS' in servicesList:
             putStormSiteProperty('metrics.reporter.register', 'org.apache.hadoop.metrics2.sink.storm.StormTimelineMetricsReporter')
+        # 2.2 stack
+        storm_site = getServicesSiteProperties(services, "storm-site")
+        security_enabled = (storm_site is not None and "storm.zookeeper.superACL" in storm_site)
+        if "ranger-env" in services["configurations"] and "ranger-storm-plugin-properties" in services[
+            "configurations"] and "ranger-storm-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            putStormRangerPluginProperty = self.putProperty(configurations, "ranger-storm-plugin-properties", services)
+            rangerEnvStormPluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-storm-plugin-enabled"]
+            putStormRangerPluginProperty("ranger-storm-plugin-enabled", rangerEnvStormPluginProperty)
+
+        rangerPluginEnabled = ''
+        if 'ranger-storm-plugin-properties' in configurations and 'ranger-storm-plugin-enabled' in configurations['ranger-storm-plugin-properties']['properties']:
+            rangerPluginEnabled = configurations['ranger-storm-plugin-properties']['properties']['ranger-storm-plugin-enabled']
+        elif 'ranger-storm-plugin-properties' in services['configurations'] and 'ranger-storm-plugin-enabled' in \
+                services['configurations']['ranger-storm-plugin-properties']['properties']:
+            rangerPluginEnabled = services['configurations']['ranger-storm-plugin-properties']['properties']['ranger-storm-plugin-enabled']
+
+        storm_authorizer_class = 'org.apache.storm.security.auth.authorizer.SimpleACLAuthorizer'
+        ranger_authorizer_class = 'org.apache.ranger.authorization.storm.authorizer.RangerStormAuthorizer'
+        # Cluster is kerberized
+        if security_enabled:
+            if rangerPluginEnabled and (rangerPluginEnabled.lower() == 'Yes'.lower()):
+                putStormSiteProperty('nimbus.authorizer', ranger_authorizer_class)
+            elif rangerPluginEnabled and (rangerPluginEnabled.lower() == 'No'.lower()) and (
+                services["configurations"]["storm-site"]["properties"]["nimbus.authorizer"] == ranger_authorizer_class):
+                putStormSiteProperty('nimbus.authorizer', storm_authorizer_class)
+        else:
+            putStormSiteAttributes('nimbus.authorizer', 'delete', 'true')
+        #2.5
+        if security_enabled:
+            _storm_principal_name = services['configurations']['storm-env']['properties']['storm_principal_name']
+            storm_bare_jaas_principal = get_bare_principal(_storm_principal_name)
+            if 'nimbus.impersonation.acl' in storm_site:
+                storm_nimbus_impersonation_acl = storm_site["nimbus.impersonation.acl"]
+                storm_nimbus_impersonation_acl.replace('{{storm_bare_jaas_principal}}', storm_bare_jaas_principal)
+                putStormSiteProperty('nimbus.impersonation.acl', storm_nimbus_impersonation_acl)
+
+    def validateStormRangerPluginConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = []
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-storm-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-storm-plugin-enabled'] if ranger_plugin_properties else 'No'
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        security_enabled = self.isSecurityEnabled(services)
+        if ranger_plugin_enabled.lower() == 'yes':
+            # ranger-hdfs-plugin must be enabled in ranger-env
+            ranger_env = getServicesSiteProperties(services, 'ranger-env')
+            if not ranger_env or not 'ranger-storm-plugin-enabled' in ranger_env or ranger_env['ranger-storm-plugin-enabled'].lower() != 'yes':
+                validationItems.append({"config-name": 'ranger-storm-plugin-enabled',
+                                        "item": self.getWarnItem("ranger-storm-plugin-properties/ranger-storm-plugin-enabled must correspond ranger-env/ranger-storm-plugin-enabled")})
+        if ("RANGER" in servicesList) and (ranger_plugin_enabled.lower() == 'Yes'.lower()) and not security_enabled:
+            validationItems.append({"config-name": "ranger-storm-plugin-enabled",
+                                    "item": self.getWarnItem("Ranger Storm plugin should not be enabled in non-kerberos environment.")})
+
+        return self.toConfigurationValidationProblems(validationItems, "ranger-storm-plugin-properties")
 
     def recommendAmsConfigurations(self, configurations, clusterData, services, hosts):
         putAmsEnvProperty = self.putProperty(configurations, "ams-env", services)
@@ -1383,16 +1438,20 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
     def getServiceConfigurationValidators(self):
         return {
             "HDFS": { "hdfs-site": self.validateHDFSConfigurations,
-                      "hadoop-env": self.validateHDFSConfigurationsEnv},
+                      "hadoop-env": self.validateHDFSConfigurationsEnv,
+                      "ranger-hdfs-plugin-properties": self.validateHDFSRangerPluginConfigurations},
             "MAPREDUCE2": {"mapred-site": self.validateMapReduce2Configurations},
             "YARN": {"yarn-site": self.validateYARNConfigurations,
-                     "yarn-env": self.validateYARNEnvConfigurations},
+                     "yarn-env": self.validateYARNEnvConfigurations,
+                     "ranger-yarn-plugin-properties": self.validateYARNRangerPluginConfigurations},
             "HIVE": {"hiveserver2-site": self.validateHiveServer2Configurations,
                      "hive-site": self.validateHiveConfigurations,
                      "hive-env": self.validateHiveConfigurationsEnv,
                      "webhcat-site": self.validateWebhcatConfigurations},
-            "HBASE": {"hbase-env": self.validateHbaseEnvConfigurations},
-            "STORM": {"storm-site": self.validateStormConfigurations},
+            "HBASE": {"hbase-env": self.validateHbaseEnvConfigurations,
+                      "ranger-hbase-plugin-properties": self.validateHBASERangerPluginConfigurations},
+            "STORM": {"storm-site": self.validateStormConfigurations,
+                      "ranger-storm-plugin-properties": self.validateStormRangerPluginConfigurations},
             "RANGER": {"admin-properties": self.validateRangerAdminConfigurations,
                        "ranger-env": self.validateRangerConfigurationsEnv,
                        "ranger-tagsync-site": self.validateRangerTagsyncConfigurations},
@@ -1954,6 +2013,19 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         validationItems = [{"config-name": 'service_check.queue.name', "item": self.validatorYarnQueue(properties, recommendedDefaults, 'service_check.queue.name', services)} ]
         return self.toConfigurationValidationProblems(validationItems, "yarn-env")
 
+    def validateYARNRangerPluginConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = []
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-yarn-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-yarn-plugin-enabled'] if ranger_plugin_properties else 'No'
+        if ranger_plugin_enabled.lower() == 'yes':
+            # ranger-hdfs-plugin must be enabled in ranger-env
+            ranger_env = getServicesSiteProperties(services, 'ranger-env')
+            if not ranger_env or not 'ranger-yarn-plugin-enabled' in ranger_env or ranger_env['ranger-yarn-plugin-enabled'].lower() != 'yes':
+                validationItems.append({"config-name": 'ranger-yarn-plugin-enabled',
+                                        "item": self.getWarnItem(
+                                            "ranger-yarn-plugin-properties/ranger-yarn-plugin-enabled must correspond ranger-env/ranger-yarn-plugin-enabled")})
+        return self.toConfigurationValidationProblems(validationItems, "ranger-yarn-plugin-properties")
+
     def validateRangerConfigurationsEnv(self, properties, recommendedDefaults, configurations, services, hosts):
         ranger_env_properties = properties
         validationItems = []
@@ -2161,6 +2233,19 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
         return self.toConfigurationValidationProblems(validationItems, "hbase-env")
 
+    def validateHBASERangerPluginConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = []
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-hbase-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-hbase-plugin-enabled'] if ranger_plugin_properties else 'No'
+        if ranger_plugin_enabled.lower() == 'yes':
+            # ranger-hdfs-plugin must be enabled in ranger-env
+            ranger_env = getServicesSiteProperties(services, 'ranger-env')
+            if not ranger_env or not 'ranger-hbase-plugin-enabled' in ranger_env or ranger_env['ranger-hbase-plugin-enabled'].lower() != 'yes':
+                validationItems.append({"config-name": 'ranger-hbase-plugin-enabled',
+                                        "item": self.getWarnItem(
+                                            "ranger-hbase-plugin-properties/ranger-hbase-plugin-enabled must correspond ranger-env/ranger-hbase-plugin-enabled")})
+        return self.toConfigurationValidationProblems(validationItems, "ranger-hbase-plugin-properties")
+
     def validateHDFSConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
         clusterEnv = getSiteProperties(configurations, "cluster-env")
         validationItems = [{"config-name": 'dfs.datanode.du.reserved', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'dfs.datanode.du.reserved')},
@@ -2183,6 +2268,19 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                             {"config-name": 'namenode_opt_newsize', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'namenode_opt_newsize')},
                             {"config-name": 'namenode_opt_maxnewsize', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'namenode_opt_maxnewsize')}]
         return self.toConfigurationValidationProblems(validationItems, "hadoop-env")
+
+    def validateHDFSRangerPluginConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = []
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-hdfs-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-hdfs-plugin-enabled'] if ranger_plugin_properties else 'No'
+        if (ranger_plugin_enabled.lower() == 'yes'):
+            # ranger-hdfs-plugin must be enabled in ranger-env
+            ranger_env = getServicesSiteProperties(services, 'ranger-env')
+            if not ranger_env or not 'ranger-hdfs-plugin-enabled' in ranger_env or ranger_env['ranger-hdfs-plugin-enabled'].lower() != 'yes':
+                validationItems.append({"config-name": 'ranger-hdfs-plugin-enabled',
+                                        "item": self.getWarnItem(
+                                            "ranger-hdfs-plugin-properties/ranger-hdfs-plugin-enabled must correspond ranger-env/ranger-hdfs-plugin-enabled")})
+        return self.toConfigurationValidationProblems(validationItems, "ranger-hdfs-plugin-properties")
 
     def validatorOneDataDirPerPartition(self, properties, propertyName, services, hosts, clusterEnv):
         if not propertyName in properties:
