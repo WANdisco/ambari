@@ -740,7 +740,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
         if kmsEnvProperties and self.checkSiteProperties(kmsEnvProperties, 'kms_user') and 'KERBEROS' in servicesList:
             kmsUser = kmsEnvProperties['kms_user']
-            kmsUserOld = self.getOldValue(self, services, 'kms-env', 'kms_user')
+            kmsUserOld = self.getOldValue(services, 'kms-env', 'kms_user')
             putCoreSiteProperty('hadoop.proxyuser.{0}.groups'.format(kmsUser), '*')
             if kmsUserOld is not None and kmsUser != kmsUserOld:
                 putCoreSitePropertyAttribute("hadoop.proxyuser.{0}.groups".format(kmsUserOld), 'delete', 'true')
