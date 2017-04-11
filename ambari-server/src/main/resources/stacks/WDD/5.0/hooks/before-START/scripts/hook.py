@@ -32,6 +32,7 @@ def setup_hadoop_env():
              )
     create_ranger_hbase_symlinks()
     create_ranger_hive_symlinks()
+    create_ranger_storm_symlinks()
 
 
 def create_javahome_symlink():
@@ -61,7 +62,30 @@ def create_ranger_hive_symlinks():
         if params.has_hive_server_host :
             from resource_management.libraries.functions.setup_ranger_plugin_xml import setup_ranger_plugin_jar_symblink
             stack_version = get_stack_version('hadoop-client')
-            setup_ranger_plugin_jar_symblink(stack_version, 'hive', component_list=['hive-server2'])
+            #create symlinks to plugin libs only in case hive server installed on host
+            if(os.path.isdir("/usr/wdd/current/hive-server2/lib")) :
+              setup_ranger_plugin_jar_symblink(stack_version, 'hive', component_list=['hive-server2'])
+
+def create_ranger_storm_symlinks():
+    import params
+    ranger_admin_hosts = default("/clusterHostInfo/ranger_admin_hosts", [])
+    has_ranger_admin = not len(ranger_admin_hosts) == 0
+    if has_ranger_admin:
+        if params.has_nimbus_host :
+            from resource_management.libraries.functions.setup_ranger_plugin_xml import setup_ranger_plugin_jar_symblink
+            stack_version = get_stack_version('hadoop-client')
+            #create symlinks to plugin libs only in case storm nimbus installed on host
+            if(os.path.isdir("/usr/wdd/current/storm-nimbus/lib")) :
+              setup_ranger_plugin_jar_symblink(stack_version, 'storm', component_list=['storm-nimbus'])
+
+
+def copy_container_executor_cfg():
+    import params
+    destination = format("{hadoop_home}/etc/hadoop/container-executor.cfg")
+
+    Link(os.path.join(params.hadoop_conf_dir, "container-executor.cfg"),
+        to=destination,
+        )
 
 class BeforeStartHook(Hook):
     def hook(self, env):
@@ -70,6 +94,7 @@ class BeforeStartHook(Hook):
 
         create_javahome_symlink()
         setup_hadoop_env()
+        copy_container_executor_cfg()
         create_topology_script_and_mapping()
 
 

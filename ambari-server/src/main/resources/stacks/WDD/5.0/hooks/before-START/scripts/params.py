@@ -18,6 +18,7 @@ limitations under the License.
 """
 
 import os
+import re
 
 from resource_management.libraries.functions import conf_select
 from resource_management.libraries.functions import default
@@ -91,6 +92,7 @@ oozie_servers = default("/clusterHostInfo/oozie_server", [])
 hcat_server_hosts = default("/clusterHostInfo/webhcat_server_host", [])
 hive_server_host = default("/clusterHostInfo/hive_server_host", [])
 hbase_master_hosts = default("/clusterHostInfo/hbase_master_hosts", [])
+nimbus_server_hosts = default("/clusterHostInfo/nimbus_hosts", [])
 hs_host = default("/clusterHostInfo/hs_host", [])
 jtnode_host = default("/clusterHostInfo/jtnode_host", [])
 namenode_host = default("/clusterHostInfo/namenode_host", [])
@@ -104,6 +106,7 @@ has_slaves = not len(slave_hosts) == 0
 has_oozie_server = not len(oozie_servers) == 0
 has_hcat_server_host = not len(hcat_server_hosts) == 0
 has_hive_server_host = not len(hive_server_host) == 0
+has_nimbus_host = not len(nimbus_server_hosts) == 0
 has_hbase_masters = not len(hbase_master_hosts) == 0
 has_zk_host = not len(zk_hosts) == 0
 has_ganglia_server = not len(ganglia_server_hosts) == 0
@@ -302,6 +305,54 @@ if dfs_lifeline_rpc_address:
 is_nn_client_port_configured = False if nn_rpc_client_port is None else True
 is_nn_dn_port_configured = False if nn_rpc_dn_port is None else True
 is_nn_healthcheck_port_configured = False if nn_rpc_healthcheck_port is None else True
+
+def get_port(address):
+  """
+  Extracts port from the address like 0.0.0.0:1019
+  """
+  if address is None:
+    return None
+  m = re.search(r'(?:http(?:s)?://)?([\w\d.]*):(\d{1,5})', address)
+  if m is not None:
+    return int(m.group(2))
+  else:
+    return None
+
+def is_secure_port(port):
+  """
+  Returns True if port is root-owned at *nix systems
+  """
+  if port is not None:
+    return port < 1024
+  else:
+    return False
+
+# Some datanode settings
+dfs_dn_addr = default('/configurations/hdfs-site/dfs.datanode.address', None)
+dfs_dn_http_addr = default('/configurations/hdfs-site/dfs.datanode.http.address', None)
+dfs_dn_https_addr = default('/configurations/hdfs-site/dfs.datanode.https.address', None)
+dfs_http_policy = default('/configurations/hdfs-site/dfs.http.policy', None)
+secure_dn_ports_are_in_use = False
+
+
+if not security_enabled:
+    hadoop_secure_dn_user = '""'
+else:
+    dfs_dn_port = get_port(dfs_dn_addr)
+    dfs_dn_http_port = get_port(dfs_dn_http_addr)
+    dfs_dn_https_port = get_port(dfs_dn_https_addr)
+    # We try to avoid inability to start datanode as a plain user due to usage of root-owned ports
+    if dfs_http_policy == "HTTPS_ONLY":
+        secure_dn_ports_are_in_use = is_secure_port(dfs_dn_port) or is_secure_port(dfs_dn_https_port)
+    elif dfs_http_policy == "HTTP_AND_HTTPS":
+        secure_dn_ports_are_in_use = is_secure_port(dfs_dn_port) or is_secure_port(dfs_dn_http_port) or is_secure_port(
+            dfs_dn_https_port)
+    else:  # params.dfs_http_policy == "HTTP_ONLY" or not defined:
+        secure_dn_ports_are_in_use = is_secure_port(dfs_dn_port) or is_secure_port(dfs_dn_http_port)
+    if secure_dn_ports_are_in_use:
+        hadoop_secure_dn_user = hdfs_user
+    else:
+        hadoop_secure_dn_user = '""'
 
 ##### end #####
 
