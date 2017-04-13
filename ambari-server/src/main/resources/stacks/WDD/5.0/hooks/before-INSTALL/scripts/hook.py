@@ -29,8 +29,6 @@ class BeforeInstallHook(Hook):
     # this is required in order for format() function from ambari to pick up variables from params module
     env.set_params(params)
 
-    fix_tmp_dir_permissions()
-
     repo_initialization.install_repos()
     if not os.path.isfile("/opt/nsn/ngdb/wdd/wdd-select"):
       Package("wdd-select")
@@ -38,6 +36,8 @@ class BeforeInstallHook(Hook):
     wdd_stack.setup()
     users_initialization.setup_users()
     java_installer.setup_java()
+
+    fix_tmp_dir_permissions()
 
     Directory(
       Script.get_stack_root(),
