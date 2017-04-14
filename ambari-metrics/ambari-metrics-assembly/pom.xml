@@ -254,7 +254,7 @@
                     </mapping>
                     <mapping>
                       <!--embedded applications-->
-                      <directory>/usr/lib/ams-hbase/</directory>
+                      <directory>/opt/nsn/ngdb/ams-hbase/</directory>
                       <sources>
                         <source>
                           <location>${collector.dir}/target/embedded/${hbase.folder}</location>
@@ -267,7 +267,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/ams-hbase/bin</directory>
+                      <directory>/opt/nsn/ngdb/ams-hbase/bin</directory>
                       <filemode>755</filemode>
                       <sources>
                         <source>
@@ -276,7 +276,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/ams-hbase/lib/</directory>
+                      <directory>/opt/nsn/ngdb/ams-hbase/lib/</directory>
                       <sources>
                         <source>
                           <location>${collector.dir}/target/lib</location>
@@ -288,7 +288,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/ams-hbase/lib/hadoop-native/</directory>
+                      <directory>/opt/nsn/ngdb/ams-hbase/lib/hadoop-native/</directory>
                       <sources>
                         <source>
                           <location>${project.build.directory}/ambari-metrics-collector-${project.version}/ambari-metrics-collector-${project.version}/hbase/lib/hadoop-native</location>
@@ -382,7 +382,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/flume/lib</directory>
+                      <directory>/opt/nsn/ngdb/flume/lib</directory>
                       <sources>
                         <source>
                           <location>${flume-sink.dir}/target/ambari-metrics-flume-sink-with-common-${project.version}.jar</location>
@@ -390,7 +390,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/storm/lib</directory>
+                      <directory>/opt/nsn/ngdb/storm/lib</directory>
                       <sources>
                         <source>
                           <location>${storm-sink.dir}/target/ambari-metrics-storm-sink-with-common-${project.version}.jar</location>
@@ -398,7 +398,7 @@
                       </sources>
                     </mapping>
                     <mapping>
-                      <directory>/usr/lib/storm/lib</directory>
+                      <directory>/opt/nsn/ngdb/storm/lib</directory>
                       <sources>
                         <source>
                           <location>${storm-sink-legacy.dir}/target/ambari-metrics-storm-sink-legacy-with-common-${project.version}.jar</location>
@@ -729,8 +729,8 @@
                     <path>/opt/nsn/ngdb/ambari-metrics-hadoop-sink</path>
                     <path>/opt/nsn/ngdb/ambari-metrics-kafka-sink</path>
                     <path>/opt/nsn/ngdb/ambari-metrics-kafka-sink/lib</path>
-                    <path>/usr/lib/flume/lib</path>
-                    <path>/usr/lib/storm/lib</path>
+                    <path>/opt/nsn/ngdb/flume/lib</path>
+                    <path>/opt/nsn/ngdb/storm/lib</path>
                   </paths>
                 </data>
                 <data>
@@ -788,7 +788,7 @@
                   <excludes>bin/**,bin/*,lib/*tests.jar</excludes>
                   <mapper>
                     <type>perm</type>
-                    <prefix>/usr/lib/ams-hbase</prefix>
+                    <prefix>/opt/nsn/ngdb/ams-hbase</prefix>
                     <filemode>644</filemode>
                   </mapper>
                 </data>
@@ -798,7 +798,7 @@
                   <mapper>
                     <type>perm</type>
                     <filemode>755</filemode>
-                    <prefix>/usr/lib/ams-hbase/bin</prefix>
+                    <prefix>/opt/nsn/ngdb/ams-hbase/bin</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -807,7 +807,7 @@
                   <mapper>
                     <type>perm</type>
                     <filemode>755</filemode>
-                    <prefix>/usr/lib/ams-hbase/lib/hadoop-native</prefix>
+                    <prefix>/opt/nsn/ngdb/ams-hbase/lib/hadoop-native</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -817,7 +817,7 @@
                   <mapper>
                     <type>perm</type>
                     <filemode>644</filemode>
-                    <prefix>/usr/lib/ams-hbase/lib</prefix>
+                    <prefix>/opt/nsn/ngdb/ams-hbase/lib</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -946,7 +946,7 @@
                     <type>perm</type>
                     <filemode>644</filemode>
                     <dirmode>755</dirmode>
-                    <prefix>/usr/lib/flume/lib</prefix>
+                    <prefix>/opt/nsn/ngdb/flume/lib</prefix>
                   </mapper>
                 </data>
 
@@ -959,7 +959,7 @@
                     <type>perm</type>
                     <filemode>644</filemode>
                     <dirmode>755</dirmode>
-                    <prefix>/usr/lib/storm/lib</prefix>
+                    <prefix>/opt/nsn/ngdb/storm/lib</prefix>
                   </mapper>
                 </data>
                 <data>
@@ -969,7 +969,7 @@
                     <type>perm</type>
                     <filemode>644</filemode>
                     <dirmode>755</dirmode>
-                    <prefix>/usr/lib/storm/lib</prefix>
+                    <prefix>/opt/nsn/ngdb/storm/lib</prefix>
                   </mapper>
                 </data>
 

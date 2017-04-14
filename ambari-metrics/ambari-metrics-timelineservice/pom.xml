@@ -135,7 +135,7 @@
             </mapping>
             <mapping>
               <!--embedded applications-->
-              <directory>/usr/lib/ams-hbase/</directory>
+              <directory>/opt/nsn/ngdb/ams-hbase/</directory>
               <sources>
                 <source>
                   <location>target/embedded/${hbase.folder}</location>
@@ -148,7 +148,7 @@
               </sources>
             </mapping>
             <mapping>
-              <directory>/usr/lib/ams-hbase/bin</directory>
+              <directory>/opt/nsn/ngdb/ams-hbase/bin</directory>
               <filemode>755</filemode>
               <sources>
                 <source>
@@ -157,7 +157,7 @@
               </sources>
             </mapping>
             <mapping>
-              <directory>/usr/lib/ams-hbase/lib/</directory>
+              <directory>/opt/nsn/ngdb/ams-hbase/lib/</directory>
               <sources>
                 <source>
                   <location>target/lib</location>

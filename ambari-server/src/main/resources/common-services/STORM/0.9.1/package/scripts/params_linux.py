@@ -72,9 +72,9 @@ stack_supports_ranger_kerberos = check_stack_feature(StackFeature.RANGER_KERBERO
 stack_supports_ranger_audit_db = check_stack_feature(StackFeature.RANGER_AUDIT_DB_SUPPORT, version_for_stack_feature_checks)
 
 # default hadoop params
-rest_lib_dir = "/usr/lib/storm/contrib/storm-rest"
+rest_lib_dir = "/opt/nsn/ngdb/storm/contrib/storm-rest"
 storm_bin_dir = "/usr/bin"
-storm_lib_dir = "/usr/lib/storm/lib/"
+storm_lib_dir = "/opt/nsn/ngdb/storm/lib/"
 
 # hadoop parameters for 2.2+
 if stack_supports_ru:
@@ -198,8 +198,8 @@ if has_metric_collector:
   pass
 metrics_report_interval = default("/configurations/ams-site/timeline.metrics.sink.report.interval", 60)
 metrics_collection_period = default("/configurations/ams-site/timeline.metrics.sink.collection.period", 10)
-metric_collector_sink_jar = "/usr/lib/storm/lib/ambari-metrics-storm-sink-with-common-*.jar"
-metric_collector_legacy_sink_jar = "/usr/lib/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar"
+metric_collector_sink_jar = "/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-with-common-*.jar"
+metric_collector_legacy_sink_jar = "/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar"
 
 jar_jvm_opts = ''
 

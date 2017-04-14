@@ -41,12 +41,12 @@ if rpm_version is not None:
   #RPM versioning support
   rpm_version = default("/configurations/hadoop-env/rpm_version", None)
 
-hadoop_native_lib = format("/usr/lib/ams-hbase/lib/hadoop-native")
+hadoop_native_lib = format("/opt/nsn/ngdb/ams-hbase/lib/hadoop-native")
 hadoop_bin_dir = "/usr/bin"
-daemon_script = "/usr/lib/ams-hbase/bin/hbase-daemon.sh"
-region_mover = "/usr/lib/ams-hbase/bin/region_mover.rb"
-region_drainer = "/usr/lib/ams-hbase/bin/draining_servers.rb"
-hbase_cmd = "/usr/lib/ams-hbase/bin/hbase"
+daemon_script = "/opt/nsn/ngdb/ams-hbase/bin/hbase-daemon.sh"
+region_mover = "/opt/nsn/ngdb/ams-hbase/bin/region_mover.rb"
+region_drainer = "/opt/nsn/ngdb/ams-hbase/bin/draining_servers.rb"
+hbase_cmd = "/opt/nsn/ngdb/ams-hbase/bin/hbase"
 
 hadoop_conf_dir = conf_select.get_hadoop_conf_dir()
 hbase_conf_dir = "/etc/ams-hbase/conf"

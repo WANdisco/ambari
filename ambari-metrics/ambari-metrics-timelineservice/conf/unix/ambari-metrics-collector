@@ -23,7 +23,7 @@ HBASE_ZK_PID=/var/run/ams-hbase/hbase-${USER}-zookeeper.pid
 HBASE_MASTER_PID=/var/run/ams-hbase/hbase-${USER}-master.pid
 HBASE_RS_PID=/var/run/ams-hbase/hbase-${USER}-regionserver.pid
 
-HBASE_DIR=/usr/lib/ams-hbase
+HBASE_DIR=/opt/nsn/ngdb/ams-hbase
 
 DAEMON_NAME=timelineserver
 

@@ -546,7 +546,7 @@ public class UpgradeCatalog221Test {
     UpgradeCatalog221 upgradeCatalog221 = new UpgradeCatalog221(injector);
     String oldContent = "some_content\n" +
       "# AMS Collector options\n" +
-      "export AMS_COLLECTOR_OPTS=\"-Djava.library.path=/usr/lib/ams-hbase/lib/hadoop-native\"\n" +
+      "export AMS_COLLECTOR_OPTS=\"-Djava.library.path=/opt/nsn/ngdb/ams-hbase/lib/hadoop-native\"\n" +
       "{% if security_enabled %}\n" +
       "export AMS_COLLECTOR_OPTS=\"$AMS_COLLECTOR_OPTS -Djava.security.auth.login.config={{ams_collector_jaas_config_file}} " +
       "-Dzookeeper.sasl.client.username={{zk_servicename}}\"\n" +
@@ -554,7 +554,7 @@ public class UpgradeCatalog221Test {
 
     String expectedContent = "some_content\n" +
       "# AMS Collector options\n" +
-      "export AMS_COLLECTOR_OPTS=\"-Djava.library.path=/usr/lib/ams-hbase/lib/hadoop-native\"\n" +
+      "export AMS_COLLECTOR_OPTS=\"-Djava.library.path=/opt/nsn/ngdb/ams-hbase/lib/hadoop-native\"\n" +
       "{% if security_enabled %}\n" +
       "export AMS_COLLECTOR_OPTS=\"$AMS_COLLECTOR_OPTS -Djava.security.auth.login.config={{ams_collector_jaas_config_file}}\"\n" +
       "{% endif %}";

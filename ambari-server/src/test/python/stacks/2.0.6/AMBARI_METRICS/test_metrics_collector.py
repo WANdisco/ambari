@@ -50,7 +50,7 @@ class TestMetricsCollector(RMFTestCase):
                               )
     self.assertResourceCalled('Execute', 'ambari-sudo.sh rm -rf /some_tmp_dir',
                               )
-    self.assertResourceCalled('Execute', '/usr/lib/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf stop regionserver',
+    self.assertResourceCalled('Execute', '/opt/nsn/ngdb/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf stop regionserver',
                               on_timeout = 'ls /var/run/ambari-metrics-collector//hbase-ams-regionserver.pid >/dev/null 2>&1 && ps `cat /var/run/ambari-metrics-collector//hbase-ams-regionserver.pid` >/dev/null 2>&1 && ambari-sudo.sh -H -E kill -9 `ambari-sudo.sh cat /var/run/ambari-metrics-collector//hbase-ams-regionserver.pid`',
                               timeout = 30,
                               user = 'ams'
@@ -58,7 +58,7 @@ class TestMetricsCollector(RMFTestCase):
     self.assertResourceCalled('File', '/var/run/ambari-metrics-collector//hbase-ams-regionserver.pid',
                               action = ['delete']
                               )
-    self.assertResourceCalled('Execute', '/usr/lib/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf stop master',
+    self.assertResourceCalled('Execute', '/opt/nsn/ngdb/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf stop master',
                               on_timeout = 'ls /var/run/ambari-metrics-collector//hbase-ams-master.pid >/dev/null 2>&1 && ps `cat /var/run/ambari-metrics-collector//hbase-ams-master.pid` >/dev/null 2>&1 && ambari-sudo.sh -H -E kill -9 `ambari-sudo.sh cat /var/run/ambari-metrics-collector//hbase-ams-master.pid`',
                               timeout = 30,
                               user = 'ams'
@@ -69,11 +69,11 @@ class TestMetricsCollector(RMFTestCase):
     self.assertResourceCalled('Execute', '/usr/sbin/ambari-metrics-collector --config /etc/ambari-metrics-collector/conf --distributed stop',
                               user = 'ams'
     )
-    self.assertResourceCalled('Execute', '/usr/lib/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf start master',
+    self.assertResourceCalled('Execute', '/opt/nsn/ngdb/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf start master',
                               not_if = 'ls /var/run/ambari-metrics-collector//hbase-ams-master.pid >/dev/null 2>&1 && ps `cat /var/run/ambari-metrics-collector//hbase-ams-master.pid` >/dev/null 2>&1',
                               user = 'ams'
     )
-    self.assertResourceCalled('Execute', '/usr/lib/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf start regionserver',
+    self.assertResourceCalled('Execute', '/opt/nsn/ngdb/ams-hbase/bin/hbase-daemon.sh --config /etc/ams-hbase/conf start regionserver',
                               not_if = 'ls /var/run/ambari-metrics-collector//hbase-ams-regionserver.pid >/dev/null 2>&1 && ps `cat /var/run/ambari-metrics-collector//hbase-ams-regionserver.pid` >/dev/null 2>&1',
                               user = 'ams'
     )
@@ -183,7 +183,7 @@ class TestMetricsCollector(RMFTestCase):
                               create_parents = True,
                               mode=0755,
     )
-    self.assertResourceCalled('File', '/usr/lib/ams-hbase/bin/hadoop',
+    self.assertResourceCalled('File', '/opt/nsn/ngdb/ams-hbase/bin/hadoop',
                               owner = 'ams',
                               mode=0755
     )

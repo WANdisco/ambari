@@ -70,7 +70,7 @@ else:
   kinit_path_local = get_kinit_path(default('/configurations/kerberos-env/executable_search_paths', None))
   tmp_dir = Script.get_tmp_dir()
 
-  storm_component_home_dir = "/usr/lib/storm"
+  storm_component_home_dir = "/opt/nsn/ngdb/storm"
   conf_dir = "/etc/storm/conf"
   if stack_version_formatted and check_stack_feature(StackFeature.ROLLING_UPGRADE, stack_version_formatted):
     storm_component_home_dir = format("{stack_root}/current/{component_directory}")

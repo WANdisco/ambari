@@ -49,7 +49,7 @@ class TestStormRestApi(TestStormBase):
 
     self.assert_configure_default()
 
-    self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; java -jar /usr/lib/storm/contrib/storm-rest/`ls /usr/lib/storm/contrib/storm-rest | grep -wE storm-rest-[0-9.-]+\\.jar` server /etc/storm/conf/config.yaml > /var/log/storm/restapi.log 2>&1 &\n echo $! > /var/run/storm/restapi.pid',
+    self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; java -jar /opt/nsn/ngdb/storm/contrib/storm-rest/`ls /opt/nsn/ngdb/storm/contrib/storm-rest | grep -wE storm-rest-[0-9.-]+\\.jar` server /etc/storm/conf/config.yaml > /var/log/storm/restapi.log 2>&1 &\n echo $! > /var/run/storm/restapi.pid',
         path = ['/usr/bin'],
         user = 'storm',
         not_if = "ambari-sudo.sh su storm -l -s /bin/bash -c '[RMF_EXPORT_PLACEHOLDER]ls /var/run/storm/restapi.pid >/dev/null 2>&1 && ps -p `cat /var/run/storm/restapi.pid` >/dev/null 2>&1'",
@@ -104,7 +104,7 @@ class TestStormRestApi(TestStormBase):
     )
 
     self.assert_configure_secured()
-    self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; java -jar /usr/lib/storm/contrib/storm-rest/`ls /usr/lib/storm/contrib/storm-rest | grep -wE storm-rest-[0-9.-]+\\.jar` server /etc/storm/conf/config.yaml > /var/log/storm/restapi.log 2>&1 &\n echo $! > /var/run/storm/restapi.pid',
+    self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; java -jar /opt/nsn/ngdb/storm/contrib/storm-rest/`ls /opt/nsn/ngdb/storm/contrib/storm-rest | grep -wE storm-rest-[0-9.-]+\\.jar` server /etc/storm/conf/config.yaml > /var/log/storm/restapi.log 2>&1 &\n echo $! > /var/run/storm/restapi.pid',
         path = ['/usr/bin'],
         user = 'storm',
         not_if = "ambari-sudo.sh su storm -l -s /bin/bash -c '[RMF_EXPORT_PLACEHOLDER]ls /var/run/storm/restapi.pid >/dev/null 2>&1 && ps -p `cat /var/run/storm/restapi.pid` >/dev/null 2>&1'",

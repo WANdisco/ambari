@@ -407,12 +407,12 @@ public class UpgradeCatalog200 extends AbstractUpgradeCatalog {
       Config flumeEnvConfig = cluster.getDesiredConfigByType(FLUME_ENV_CONFIG);
       if (flumeEnvConfig != null) {
         String content = flumeEnvConfig.getProperties().get(CONTENT_PROPERTY);
-        if (content != null && !content.contains("/usr/lib/flume/lib/ambari-metrics-flume-sink.jar")) {
+        if (content != null && !content.contains("/opt/nsn/ngdb/flume/lib/ambari-metrics-flume-sink.jar")) {
           String newPartOfContent = "\n\n" +
             "# Note that the Flume conf directory is always included in the classpath.\n" +
             "# Add flume sink to classpath\n" +
-            "if [ -e \"/usr/lib/flume/lib/ambari-metrics-flume-sink.jar\" ]; then\n" +
-            "  export FLUME_CLASSPATH=$FLUME_CLASSPATH:/usr/lib/flume/lib/ambari-metrics-flume-sink.jar\n" +
+            "if [ -e \"/opt/nsn/ngdb/flume/lib/ambari-metrics-flume-sink.jar\" ]; then\n" +
+            "  export FLUME_CLASSPATH=$FLUME_CLASSPATH:/opt/nsn/ngdb/flume/lib/ambari-metrics-flume-sink.jar\n" +
             "fi\n";
           content += newPartOfContent;
           Map<String, String> updates = Collections.singletonMap(CONTENT_PROPERTY, content);

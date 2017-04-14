@@ -49,18 +49,18 @@ class TestStormUiServer(TestStormBase):
 
     self.assert_configure_default()
 
-    self.assertResourceCalled('Link', '/usr/lib/storm/lib//ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
                               action=['delete'],
                               )
 
-    self.assertResourceCalled('Link', '/usr/lib/storm/lib/ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink.jar',
                               action=['delete'],
                               )
 
-    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /usr/lib/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar '
-                                         '/usr/lib/storm/lib//ambari-metrics-storm-sink.jar',
-                              not_if=format("ls /usr/lib/storm/lib//ambari-metrics-storm-sink.jar"),
-                              only_if=format("ls /usr/lib/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar")
+    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar '
+                                         '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
+                              not_if=format("ls /opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar"),
+                              only_if=format("ls /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar")
                               )
     self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; storm ui > /var/log/storm/ui.out 2>&1 &\n echo $! > /var/run/storm/ui.pid',
         path = ['/usr/bin'],
@@ -92,18 +92,18 @@ class TestStormUiServer(TestStormBase):
 
     self.assert_configure_default()
 
-    self.assertResourceCalled('Link', '/usr/lib/storm/lib//ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
                               action=['delete'],
                               )
 
-    self.assertResourceCalled('Link', '/usr/lib/storm/lib/ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink.jar',
                               action=['delete'],
                               )
 
-    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /usr/lib/storm/lib/ambari-metrics-storm-sink-with-common-*.jar '
-                                         '/usr/lib/storm/lib//ambari-metrics-storm-sink.jar',
-                              not_if=format("ls /usr/lib/storm/lib//ambari-metrics-storm-sink.jar"),
-                              only_if=format("ls /usr/lib/storm/lib/ambari-metrics-storm-sink-with-common-*.jar")
+    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-with-common-*.jar '
+                                         '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
+                              not_if=format("ls /opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar"),
+                              only_if=format("ls /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-with-common-*.jar")
                               )
     self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; storm ui > /var/log/storm/ui.out 2>&1 &\n echo $! > /var/run/storm/ui.pid',
         path = ['/usr/bin'],
@@ -162,18 +162,18 @@ class TestStormUiServer(TestStormBase):
     self.assert_configure_secured()
 
 
-    self.assertResourceCalled('Link', '/usr/lib/storm/lib//ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
                               action=['delete'],
                               )
 
-    self.assertResourceCalled('Link', '/usr/lib/storm/lib/ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink.jar',
                               action=['delete'],
                               )
 
-    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /usr/lib/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar '
-                                         '/usr/lib/storm/lib//ambari-metrics-storm-sink.jar',
-                              not_if=format("ls /usr/lib/storm/lib//ambari-metrics-storm-sink.jar"),
-                              only_if=format("ls /usr/lib/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar")
+    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar '
+                                         '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
+                              not_if=format("ls /opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar"),
+                              only_if=format("ls /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar")
                               )
     self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; storm ui > /var/log/storm/ui.out 2>&1 &\n echo $! > /var/run/storm/ui.pid',
         path = ['/usr/bin'],
