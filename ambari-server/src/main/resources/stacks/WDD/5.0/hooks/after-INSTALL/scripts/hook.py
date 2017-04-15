@@ -80,7 +80,7 @@ def build_framework_tarballs(config):
         """)  # 1 means directory changed while we were making an archive
         ExecuteScript("build_{0}_framework".format(framework_name),
                       code=build_framework_script,
-                      only_if=format("test -d {framework_path}"),
+                      only_if=format("test -d {framework_path}/lib"),
                       not_if=format("test -f {framework_file_path}"),
                       user="root")
 

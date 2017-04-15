@@ -39,6 +39,11 @@ def hcat_service_check():
     output_file = format("{hive_apps_whs_dir}/hcatsmoke{unique}")
     test_cmd = format("fs -test -e {output_file}")
 
+    File(os.path.join(params.hcatalog_home_dir, "bin", "hcat"),
+         mode=0755,
+         content=StaticFile('hcat.sh')
+         )
+
     if params.security_enabled:
       kinit_cmd = format(
         "{kinit_path_local} -kt {smoke_user_keytab} {smokeuser_principal}; ")
