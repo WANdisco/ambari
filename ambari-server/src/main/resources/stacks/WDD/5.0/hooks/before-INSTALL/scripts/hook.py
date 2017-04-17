@@ -12,18 +12,17 @@ def fix_tmp_dir_permissions():
   config = Script.get_config()
   tmp_dir = Script.get_tmp_dir()
   hadoop_java_io_tmpdir = os.path.join(tmp_dir, "hadoop_java_io_tmpdir")
-  hdfs_user = config['configurations']['hadoop-env']['hdfs_user']
-  user_group = config['configurations']['cluster-env']['user_group']
+  user_group = config["configurations"]["cluster-env"]["user_group"]
+  hadoop_user = config["configurations"]["cluster-env"]["hadoop.user.name"]
 
   Directory(hadoop_java_io_tmpdir,
-            owner=hdfs_user,
+            owner=hadoop_user,
             group=user_group,
-            mode=01777
+            mode=0777
             )
 
 
 class BeforeInstallHook(Hook):
-
   def hook(self, env):
     import params
     # this is required in order for format() function from ambari to pick up variables from params module
