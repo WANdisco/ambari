@@ -55,7 +55,7 @@ def ams_service(name, action):
       cmd = format("{cmd} --distributed")
 
     if action == 'start':
-      Execute(format("{sudo} rm -rf {hbase_tmp_dir}/*.tmp")
+      Execute(format("{sudo} rm -rf {hbase_tmp_dir}/*")
       )
 
       if not params.is_hbase_distributed:
