@@ -2325,7 +2325,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         return ['ZOOKEEPER_SERVER', 'HBASE_MASTER']
 
     def getNotValuableComponents(self):
-        return ['JOURNALNODE', 'ZKFC', 'GANGLIA_MONITOR']
+        return ['JOURNALNODE', 'ZKFC', 'GANGLIA_MONITOR', 'APP_TIMELINE_SERVER']
 
     def getNotPreferableOnServerComponents(self):
         return ['GANGLIA_SERVER', 'METRICS_COLLECTOR']
@@ -2341,6 +2341,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             'NAMENODE': {"else": 0},
             'SECONDARY_NAMENODE': {"else": 1},
             'HBASE_MASTER': {6: 0, 31: 2, "else": 3},
+            'APP_TIMELINE_SERVER': {31: 1, "else": 2},
 
             'HISTORYSERVER': {31: 1, "else": 2},
             'RESOURCEMANAGER': {31: 1, "else": 2},

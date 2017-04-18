@@ -24,6 +24,27 @@
       <displayName>YARN</displayName>
       <version>2.7.3</version>
       <extends>common-services/YARN/2.1.0.2.0</extends>
+      <quickLinksConfigurations>
+        <quickLinksConfiguration>
+          <fileName>quicklinks.json</fileName>
+          <default>true</default>
+        </quickLinksConfiguration>
+      </quickLinksConfigurations>
+
+      <components>
+        <component>
+          <name>APP_TIMELINE_SERVER</name>
+          <displayName>App Timeline Server</displayName>
+          <category>MASTER</category>
+          <cardinality>1</cardinality>
+          <reassignAllowed>true</reassignAllowed>
+          <commandScript>
+            <script>scripts/application_timeline_server.py</script>
+            <scriptType>PYTHON</scriptType>
+            <timeout>600</timeout>
+          </commandScript>
+        </component>
+      </components>
 
       <osSpecifics>
         <osSpecific>
@@ -49,6 +70,14 @@
       <displayName>MapReduce2</displayName>
       <version>2.7.3</version>
       <extends>common-services/MAPREDUCE2/2.1.0.2.0.6.0</extends>
+
+      <quickLinksConfigurations-dir>quicklinks-mapred</quickLinksConfigurations-dir>
+      <quickLinksConfigurations>
+        <quickLinksConfiguration>
+          <fileName>quicklinks.json</fileName>
+          <default>true</default>
+        </quickLinksConfiguration>
+      </quickLinksConfigurations>
 
       <osSpecifics>
         <osSpecific>
