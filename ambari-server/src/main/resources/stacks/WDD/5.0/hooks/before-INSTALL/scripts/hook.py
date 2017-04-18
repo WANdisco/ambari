@@ -11,15 +11,19 @@ import wdd_stack
 def fix_tmp_dir_permissions():
   config = Script.get_config()
   tmp_dir = Script.get_tmp_dir()
+
   hadoop_java_io_tmpdir = os.path.join(tmp_dir, "hadoop_java_io_tmpdir")
   user_group = config["configurations"]["cluster-env"]["user_group"]
-  hadoop_user = config["configurations"]["cluster-env"]["hadoop.user.name"]
 
-  Directory(hadoop_java_io_tmpdir,
-            owner=hadoop_user,
-            group=user_group,
-            mode=0777
-            )
+  if 'hadoop-env' in config['configurations']:
+    hadoop_user = config['configurations']['hadoop-env']['hdfs_user']
+    Directory(hadoop_java_io_tmpdir,
+              owner=hadoop_user,
+              group=user_group,
+              mode=0777
+              )
+  else:
+    Logger.info("Will not fix tmp_dir permissions because hadoop is not installed")
 
 
 class BeforeInstallHook(Hook):
@@ -50,5 +54,8 @@ class BeforeInstallHook(Hook):
     Logger.info("Hadoop conf dir is: {0}".format(conf_select.get_hadoop_conf_dir()))
 
 
+
 if __name__ == "__main__":
   BeforeInstallHook().execute()
+
+
