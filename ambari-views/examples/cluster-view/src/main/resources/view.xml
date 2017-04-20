@@ -69,7 +69,7 @@
       <key>setting2</key>
       <value>value2</value>
     </property>
-    <stack-id>HDP-2.*</stack-id>
+    <stack-id>WDD-5.*</stack-id>
     <services>
       <service>HDFS</service>
     </services>
