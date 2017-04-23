@@ -1,6 +1,7 @@
 #!/usr/bin/env ambari-python-wrap
 
 import imp
+import math
 import os
 import re
 import socket
@@ -10,6 +11,7 @@ import sys
 from math import ceil, floor
 
 from resource_management.core.logger import Logger
+from resource_management.core.exceptions import Fail
 from resource_management.libraries.functions.mounted_dirs_helper import get_mounts_with_multiple_data_dirs
 from resource_management.libraries.functions.get_bare_principal import get_bare_principal
 from urlparse import urlparse
@@ -21,6 +23,9 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
     def __init__(self):
         super(WDD50StackAdvisor, self).__init__()
         Logger.initialize_logger()
+        self.HIVE_INTERACTIVE_SITE = 'hive-interactive-site'
+        self.YARN_ROOT_DEFAULT_QUEUE_NAME = 'default'
+        self.AMBARI_MANAGED_LLAP_QUEUE_NAME = 'llap'
 
     def getComponentLayoutValidations(self, services, hosts):
         """Returns array of Validation objects about issues with hostnames components assigned to"""
@@ -89,7 +94,122 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             "RANGER": self.recommendRangerConfigurations,
             "RANGER_KMS": self.recommendRangerKMSConfigurations,
             "HIVE": self.recommendHiveConfigurations,
+            "KAFKA": self.recommendKAFKAConfigurations,
         }
+
+    def recommendKAFKAConfigurations(self, configurations, clusterData, services, hosts):
+
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        kafka_broker = getServicesSiteProperties(services, "kafka-broker")
+
+        security_enabled = self.isSecurityEnabled(services)
+
+        putKafkaBrokerProperty = self.putProperty(configurations, "kafka-broker", services)
+        putKafkaLog4jProperty = self.putProperty(configurations, "kafka-log4j", services)
+        putKafkaBrokerAttributes = self.putPropertyAttribute(configurations, "kafka-broker")
+
+        if security_enabled:
+            kafka_env = getServicesSiteProperties(services, "kafka-env")
+            kafka_user = kafka_env.get('kafka_user') if kafka_env is not None else None
+
+            if kafka_user is not None:
+                kafka_super_users = kafka_broker.get('super.users') if kafka_broker is not None else None
+
+                # kafka_super_super_users is expected to be formatted as:  User:user1;User:user2
+                if kafka_super_users is not None and kafka_super_users != '':
+                    # Parse kafka_super_users to get a set of unique user names and rebuild the property value
+                    user_names = set()
+                    user_names.add(kafka_user)
+                    for match in re.findall('User:([^;]*)', kafka_super_users):
+                        user_names.add(match)
+                    kafka_super_users = 'User:' + ";User:".join(user_names)
+                else:
+                    kafka_super_users = 'User:' + kafka_user
+
+                putKafkaBrokerProperty("super.users", kafka_super_users)
+
+            putKafkaBrokerProperty("principal.to.local.class", "kafka.security.auth.KerberosPrincipalToLocal")
+            putKafkaBrokerProperty("security.inter.broker.protocol", "PLAINTEXTSASL")
+            putKafkaBrokerProperty("zookeeper.set.acl", "true")
+
+        else:  # not security_enabled
+            # remove unneeded properties
+            putKafkaBrokerAttributes('super.users', 'delete', 'true')
+            putKafkaBrokerAttributes('principal.to.local.class', 'delete', 'true')
+            putKafkaBrokerAttributes('security.inter.broker.protocol', 'delete', 'true')
+
+        # Update ranger-kafka-plugin-properties/ranger-kafka-plugin-enabled to match ranger-env/ranger-kafka-plugin-enabled
+        if "ranger-env" in services["configurations"] \
+                and "ranger-kafka-plugin-properties" in services["configurations"] \
+                and "ranger-kafka-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            putKafkaRangerPluginProperty = self.putProperty(configurations, "ranger-kafka-plugin-properties", services)
+            ranger_kafka_plugin_enabled = services["configurations"]["ranger-env"]["properties"]["ranger-kafka-plugin-enabled"]
+            putKafkaRangerPluginProperty("ranger-kafka-plugin-enabled", ranger_kafka_plugin_enabled)
+
+        # Determine if the Ranger/Kafka Plugin is enabled
+        ranger_plugin_enabled = "RANGER" in servicesList
+        # Only if the RANGER service is installed....
+        if ranger_plugin_enabled:
+            # If ranger-kafka-plugin-properties/ranger-kafka-plugin-enabled,
+            # determine if the Ranger/Kafka plug-in enabled enabled or not
+            if 'ranger-kafka-plugin-properties' in configurations and \
+                            'ranger-kafka-plugin-enabled' in configurations['ranger-kafka-plugin-properties']['properties']:
+                ranger_plugin_enabled = configurations['ranger-kafka-plugin-properties']['properties']['ranger-kafka-plugin-enabled'].lower() == 'yes'
+            # If ranger-kafka-plugin-properties/ranger-kafka-plugin-enabled was not changed,
+            # determine if the Ranger/Kafka plug-in enabled enabled or not
+            elif 'ranger-kafka-plugin-properties' in services['configurations'] and \
+                            'ranger-kafka-plugin-enabled' in services['configurations']['ranger-kafka-plugin-properties']['properties']:
+                ranger_plugin_enabled = services['configurations']['ranger-kafka-plugin-properties']['properties']['ranger-kafka-plugin-enabled'].lower() == 'yes'
+
+        # Determine the value for kafka-broker/authorizer.class.name
+        if ranger_plugin_enabled:
+            # If the Ranger plugin for Kafka is enabled, set authorizer.class.name to
+            # "org.apache.ranger.authorization.kafka.authorizer.RangerKafkaAuthorizer" whether Kerberos is
+            # enabled or not.
+            putKafkaBrokerProperty("authorizer.class.name", 'org.apache.ranger.authorization.kafka.authorizer.RangerKafkaAuthorizer')
+        elif security_enabled:
+            putKafkaBrokerProperty("authorizer.class.name", 'kafka.security.auth.SimpleAclAuthorizer')
+        else:
+            putKafkaBrokerAttributes('authorizer.class.name', 'delete', 'true')
+
+        #If AMS is part of Services, use the KafkaTimelineMetricsReporter for metric reporting. Default is ''.
+        if "AMBARI_METRICS" in servicesList:
+            putKafkaBrokerProperty('kafka.metrics.reporters', 'org.apache.hadoop.metrics2.sink.kafka.KafkaTimelineMetricsReporter')
+
+        if ranger_plugin_enabled:
+            kafkaLog4jRangerLines = [{
+                "name": "log4j.appender.rangerAppender",
+                "value": "org.apache.log4j.DailyRollingFileAppender"
+            },
+            {
+                "name": "log4j.appender.rangerAppender.DatePattern",
+                "value": "'.'yyyy-MM-dd-HH"
+            },
+            {
+                "name": "log4j.appender.rangerAppender.File",
+                "value": "${kafka.logs.dir}/ranger_kafka.log"
+            },
+            {
+                "name": "log4j.appender.rangerAppender.layout",
+                "value": "org.apache.log4j.PatternLayout"
+            },
+            {
+                "name": "log4j.appender.rangerAppender.layout.ConversionPattern",
+                "value": "%d{ISO8601} %p [%t] %C{6} (%F:%L) - %m%n"
+            },
+            {
+                "name": "log4j.logger.org.apache.ranger",
+                "value": "INFO, rangerAppender"
+            }]
+
+            # change kafka-log4j when ranger plugin is installed
+            if 'kafka-log4j' in services['configurations'] and 'content' in services['configurations']['kafka-log4j']['properties']:
+                kafkaLog4jContent = services['configurations']['kafka-log4j']['properties']['content']
+                for item in range(len(kafkaLog4jRangerLines)):
+                    if kafkaLog4jRangerLines[item]["name"] not in kafkaLog4jContent:
+                        kafkaLog4jContent+= '\n' + kafkaLog4jRangerLines[item]["name"] + '=' + kafkaLog4jRangerLines[item]["value"]
+                putKafkaLog4jProperty("content",kafkaLog4jContent)
+
 
     def recommendYARNConfigurations(self, configurations, clusterData, services, hosts):
         putYarnProperty = self.putProperty(configurations, "yarn-site", services)
@@ -183,30 +303,29 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         # end of HDP 2.2 stack
 
         # HDP 2.3 stack
-                        "ranger-yarn-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+        if "tez-site" not in services["configurations"]:
+            putYarnProperty('yarn.timeline-service.entity-group-fs-store.group-id-plugin-classes', '')
+        else:
+            putYarnProperty('yarn.timeline-service.entity-group-fs-store.group-id-plugin-classes', 'org.apache.tez.dag.history.logging.ats.TimelineCachePluginImpl')
+
+        if "ranger-env" in services["configurations"] and "ranger-yarn-plugin-properties" in services["configurations"] and \
+            "ranger-yarn-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
             putYarnRangerPluginProperty = self.putProperty(configurations, "ranger-yarn-plugin-properties", services)
-            rangerEnvYarnPluginProperty = services["configurations"]["ranger-env"]["properties"][
-                "ranger-yarn-plugin-enabled"]
+            rangerEnvYarnPluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-yarn-plugin-enabled"]
             putYarnRangerPluginProperty("ranger-yarn-plugin-enabled", rangerEnvYarnPluginProperty)
         rangerPluginEnabled = ''
-        if 'ranger-yarn-plugin-properties' in configurations and 'ranger-yarn-plugin-enabled' in \
-                configurations['ranger-yarn-plugin-properties']['properties']:
-            rangerPluginEnabled = configurations['ranger-yarn-plugin-properties']['properties'][
-                'ranger-yarn-plugin-enabled']
-        elif 'ranger-yarn-plugin-properties' in services['configurations'] and 'ranger-yarn-plugin-enabled' in \
-                services['configurations']['ranger-yarn-plugin-properties']['properties']:
-            rangerPluginEnabled = services['configurations']['ranger-yarn-plugin-properties']['properties'][
-                'ranger-yarn-plugin-enabled']
+        if 'ranger-yarn-plugin-properties' in configurations and 'ranger-yarn-plugin-enabled' in configurations['ranger-yarn-plugin-properties']['properties']:
+            rangerPluginEnabled = configurations['ranger-yarn-plugin-properties']['properties']['ranger-yarn-plugin-enabled']
+        elif 'ranger-yarn-plugin-properties' in services['configurations'] and 'ranger-yarn-plugin-enabled' in services['configurations']['ranger-yarn-plugin-properties']['properties']:
+            rangerPluginEnabled = services['configurations']['ranger-yarn-plugin-properties']['properties']['ranger-yarn-plugin-enabled']
 
         if rangerPluginEnabled and (rangerPluginEnabled.lower() == 'Yes'.lower()):
             putYarnProperty('yarn.acl.enable', 'true')
-            putYarnProperty('yarn.authorization-provider',
-                                'org.apache.ranger.authorization.yarn.authorizer.RangerYarnAuthorizer')
+            putYarnProperty('yarn.authorization-provider', 'org.apache.ranger.authorization.yarn.authorizer.RangerYarnAuthorizer')
         else:
             putYarnPropertyAttribute('yarn.authorization-provider', 'delete', 'true')
 
-        if 'yarn-site' in services["configurations"] and 'yarn.resourcemanager.proxy-user-privileges.enabled' in \
-                services["configurations"]["yarn-site"]["properties"]:
+        if 'yarn-site' in services["configurations"] and 'yarn.resourcemanager.proxy-user-privileges.enabled' in services["configurations"]["yarn-site"]["properties"]:
             if self.isSecurityEnabled(services):
                 # enable proxy-user privileges for secure clusters for long-running services (spark streaming etc)
                 putYarnProperty('yarn.resourcemanager.proxy-user-privileges.enabled', 'true')
@@ -216,6 +335,22 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             else:
                 putYarnProperty('yarn.resourcemanager.proxy-user-privileges.enabled', 'false')
          # end of HDP 2.3 stack
+
+        #HDP 2.5 - LLAP config
+        # Queue 'llap' creation/removal logic (Used by Hive Interactive server and associated LLAP)
+        if 'hive-interactive-env' in services['configurations'] and 'enable_hive_interactive' in services['configurations']['hive-interactive-env']['properties']:
+            enable_hive_interactive = services['configurations']['hive-interactive-env']['properties']['enable_hive_interactive']
+            LLAP_QUEUE_NAME = 'llap'
+
+            # Hive Server interactive is already added or getting added
+            if enable_hive_interactive == 'true':
+                self.checkAndManageLlapQueue(services, configurations, hosts, LLAP_QUEUE_NAME)
+                self.updateLlapConfigs(configurations, services, hosts, LLAP_QUEUE_NAME)
+            else:  # When Hive Interactive Server is in 'off/removed' state.
+                self.checkAndStopLlapQueue(services, configurations, LLAP_QUEUE_NAME)
+        #end of HDP 2.5 llap config
+
+
 
     def recommendMapReduce2Configurations(self, configurations, clusterData, services, hosts):
         putMapredProperty = self.putProperty(configurations, "mapred-site", services)
@@ -988,10 +1123,18 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         container_size_bytes = int(containerSize)*1024*1024
 
         putHiveEnvProperty = self.putProperty(configurations, "hive-env", services)
+        putHiveEnvPropertyAttributes = self.putPropertyAttribute(configurations, "hive-env")
         putHiveSiteProperty = self.putProperty(configurations, "hive-site", services)
+        putHiveSitePropertyAttribute = self.putPropertyAttribute(configurations, "hive-site")
         putHiveServerProperty = self.putProperty(configurations, "hiveserver2-site", services)
+        putWebhcatSiteProperty = self.putProperty(configurations, "webhcat-site", services)
         putHiveServerPropertyAttribute = self.putPropertyAttribute(configurations, "hiveserver2-site")
+        putHiveInteractiveEnvProperty = self.putProperty(configurations, "hive-interactive-env", services)
+        putHiveInteractiveSiteProperty = self.putProperty(configurations, self.HIVE_INTERACTIVE_SITE, services)
+        putHiveInteractiveEnvPropertyAttribute = self.putPropertyAttribute(configurations, "hive-interactive-env")
 
+        #Hive 2.1 stack
+        #####################################
         putHiveSiteProperty('hive.auto.convert.join.noconditionaltask.size', int(round(container_size_bytes / 3)))
         putHiveSiteProperty('hive.tez.java.opts', "-server -Xmx" + str(int(round((0.8 * containerSize) + 0.5)))
                         + "m -Djava.net.preferIPv4Stack=true -XX:NewRatio=8 -XX:+UseNUMA -XX:+UseParallelGC -XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps")
@@ -1052,11 +1195,102 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             if "hostnames" in meta:
                 appendCoreSiteProperty('hadoop.proxyuser.HTTP.hosts', meta["hostnames"], updateCallback)
 
+        #####################################
+        #end of Hive 2.1 stack advisor
+
+        #Hive 2.2 stack advisor
+        #####################################
+        #  Storage
+        putHiveEnvProperty("hive_exec_orc_storage_strategy", "SPEED")
+        putHiveSiteProperty("hive.exec.orc.encoding.strategy",
+                            configurations["hive-env"]["properties"]["hive_exec_orc_storage_strategy"])
+        putHiveSiteProperty("hive.exec.orc.compression.strategy",
+                            configurations["hive-env"]["properties"]["hive_exec_orc_storage_strategy"])
+
+        putHiveSiteProperty("hive.exec.orc.default.stripe.size", "67108864")
+        putHiveSiteProperty("hive.exec.orc.default.compress", "ZLIB")
+        putHiveSiteProperty("hive.optimize.index.filter", "true")
+        putHiveSiteProperty("hive.optimize.sort.dynamic.partition", "false")
+
+        # Vectorization
+        putHiveSiteProperty("hive.vectorized.execution.enabled", "true")
+        putHiveSiteProperty("hive.vectorized.execution.reduce.enabled", "false")
+
+        # Transactions
+        putHiveEnvProperty("hive_txn_acid", "off")
+        if str(configurations["hive-env"]["properties"]["hive_txn_acid"]).lower() == "on":
+            putHiveSiteProperty("hive.txn.manager", "org.apache.hadoop.hive.ql.lockmgr.DbTxnManager")
+            putHiveSiteProperty("hive.support.concurrency", "true")
+            putHiveSiteProperty("hive.compactor.initiator.on", "true")
+            putHiveSiteProperty("hive.compactor.worker.threads", "1")
+            putHiveSiteProperty("hive.enforce.bucketing", "true")
+            putHiveSiteProperty("hive.exec.dynamic.partition.mode", "nonstrict")
+        else:
+            putHiveSiteProperty("hive.txn.manager", "org.apache.hadoop.hive.ql.lockmgr.DummyTxnManager")
+            putHiveSiteProperty("hive.support.concurrency", "false")
+            putHiveSiteProperty("hive.compactor.initiator.on", "false")
+            putHiveSiteProperty("hive.compactor.worker.threads", "0")
+            putHiveSiteProperty("hive.enforce.bucketing", "false")
+            putHiveSiteProperty("hive.exec.dynamic.partition.mode", "strict")
+
+        # CBO
+        if "hive-site" in services["configurations"] and "hive.cbo.enable" in services["configurations"]["hive-site"][
+            "properties"]:
+            hive_cbo_enable = services["configurations"]["hive-site"]["properties"]["hive.cbo.enable"]
+            putHiveSiteProperty("hive.stats.fetch.partition.stats", hive_cbo_enable)
+            putHiveSiteProperty("hive.stats.fetch.column.stats", hive_cbo_enable)
+
+        putHiveSiteProperty("hive.compute.query.using.stats", "true")
+
+        # Interactive Query
+        putHiveSiteProperty("hive.server2.tez.initialize.default.sessions", "false")
+        putHiveSiteProperty("hive.server2.tez.sessions.per.default.queue", "1")
+        putHiveSiteProperty("hive.server2.enable.doAs", "true")
+
+        yarn_queues = "default"
+        capacitySchedulerProperties = {}
+        if "capacity-scheduler" in services['configurations']:
+            if "capacity-scheduler" in services['configurations']["capacity-scheduler"]["properties"]:
+                properties = str(services['configurations']["capacity-scheduler"]["properties"]["capacity-scheduler"]).split('\n')
+                for property in properties:
+                    key, sep, value = property.partition("=")
+                    capacitySchedulerProperties[key] = value
+            if "yarn.scheduler.capacity.root.queues" in capacitySchedulerProperties:
+                yarn_queues = str(capacitySchedulerProperties["yarn.scheduler.capacity.root.queues"])
+            elif "yarn.scheduler.capacity.root.queues" in services['configurations']["capacity-scheduler"]["properties"]:
+                yarn_queues = services['configurations']["capacity-scheduler"]["properties"][
+                    "yarn.scheduler.capacity.root.queues"]
+        # Interactive Queues property attributes
+        putHiveServerPropertyAttribute = self.putPropertyAttribute(configurations, "hiveserver2-site")
+        toProcessQueues = yarn_queues.split(",")
+        leafQueueNames = set()  # Remove duplicates
+        while len(toProcessQueues) > 0:
+            queue = toProcessQueues.pop()
+            queueKey = "yarn.scheduler.capacity.root." + queue + ".queues"
+            if queueKey in capacitySchedulerProperties:
+                # This is a parent queue - need to add children
+                subQueues = capacitySchedulerProperties[queueKey].split(",")
+                for subQueue in subQueues:
+                    toProcessQueues.append(queue + "." + subQueue)
+            else:
+                # This is a leaf queue
+                queueName = queue.split(".")[
+                    -1]  # Fully qualified queue name does not work, we should use only leaf name
+                leafQueueNames.add(queueName)
+        leafQueues = [{"label": str(queueName) + " queue", "value": queueName} for queueName in leafQueueNames]
+        leafQueues = sorted(leafQueues, key=lambda q: q['value'])
+        putHiveSitePropertyAttribute("hive.server2.tez.default.queues", "entries", leafQueues)
+        putHiveSiteProperty("hive.server2.tez.default.queues",
+                            ",".join([leafQueue['value'] for leafQueue in leafQueues]))
+
+        webhcat_queue = self.recommendYarnQueue(services, "webhcat-site", "templeton.hadoop.queue.name")
+        if webhcat_queue is not None:
+            putWebhcatSiteProperty("templeton.hadoop.queue.name", webhcat_queue)
+
         # Recommend Ranger Hive authorization as per Ranger Hive plugin property
         if "ranger-env" in services["configurations"] and "hive-env" in services["configurations"] and \
                         "ranger-hive-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
-            rangerEnvHivePluginProperty = services["configurations"]["ranger-env"]["properties"][
-                "ranger-hive-plugin-enabled"]
+            rangerEnvHivePluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-hive-plugin-enabled"]
             if (rangerEnvHivePluginProperty.lower() == "yes"):
                 putHiveEnvProperty("hive_security_authorization", "RANGER")
 
@@ -1114,19 +1348,21 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             pass
         auth_manager_values = auth_manager_value.split(",")
         sqlstdauth_class = "org.apache.hadoop.hive.ql.security.authorization.MetaStoreAuthzAPIAuthorizerEmbedOnly"
+
         putHiveSiteProperty("hive.server2.enable.doAs", "true")
 
         # hive_security_authorization == 'sqlstdauth'
         if str(configurations["hive-env"]["properties"]["hive_security_authorization"]).lower() == "sqlstdauth":
             putHiveSiteProperty("hive.server2.enable.doAs", "false")
             putHiveServerProperty("hive.security.authorization.enabled", "true")
-            putHiveServerProperty("hive.security.authorization.manager", "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory")
+            putHiveServerProperty("hive.security.authorization.manager",
+                                  "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory")
             putHiveServerProperty("hive.security.authenticator.manager",
-                                      "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator")
+                                  "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator")
             putHiveServerProperty("hive.conf.restricted.list",
-                                      "hive.security.authenticator.manager,hive.security.authorization.manager,hive.users.in.admin.role")
+                                  "hive.security.authenticator.manager,hive.security.authorization.manager,hive.users.in.admin.role")
             putHiveSiteProperty("hive.security.authorization.manager",
-                                    "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdConfOnlyAuthorizerFactory")
+                                "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdConfOnlyAuthorizerFactory")
             if sqlstdauth_class not in auth_manager_values:
                 auth_manager_values.append(sqlstdauth_class)
         elif sqlstdauth_class in auth_manager_values:
@@ -1143,10 +1379,155 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             putHiveServerProperty("hive.security.authenticator.manager", "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator")
             putHiveServerProperty("hive.conf.restricted.list", "hive.security.authorization.enabled,hive.security.authorization.manager,hive.security.authenticator.manager")
 
+        putHiveSiteProperty("hive.server2.use.SSL", "false")
+
+        # Hive authentication
+        hive_server2_auth = None
+        if "hive-site" in services["configurations"] and "hive.server2.authentication" in services["configurations"]["hive-site"]["properties"]:
+            hive_server2_auth = str(services["configurations"]["hive-site"]["properties"]["hive.server2.authentication"]).lower()
+        elif "hive.server2.authentication" in configurations["hive-site"]["properties"]:
+            hive_server2_auth = str(configurations["hive-site"]["properties"]["hive.server2.authentication"]).lower()
+
+        if hive_server2_auth == "ldap":
+            putHiveSiteProperty("hive.server2.authentication.ldap.url", "")
+        else:
+            if ("hive.server2.authentication.ldap.url" in configurations["hive-site"]["properties"]) or \
+                    ("hive-site" not in services["configurations"]) or \
+                    ("hive-site" in services["configurations"] and "hive.server2.authentication.ldap.url" in
+                        services["configurations"]["hive-site"]["properties"]):
+                putHiveSitePropertyAttribute("hive.server2.authentication.ldap.url", "delete", "true")
+
+        if hive_server2_auth == "kerberos":
+            if "hive-site" in services["configurations"] and "hive.server2.authentication.kerberos.keytab" not in services["configurations"]["hive-site"]["properties"]:
+                putHiveSiteProperty("hive.server2.authentication.kerberos.keytab", "")
+            if "hive-site" in services["configurations"] and "hive.server2.authentication.kerberos.principal" not in services["configurations"]["hive-site"]["properties"]:
+                putHiveSiteProperty("hive.server2.authentication.kerberos.principal", "")
+        elif "KERBEROS" not in servicesList:  # Since 'hive_server2_auth' cannot be relied on within the default, empty recommendations request
+            if ("hive.server2.authentication.kerberos.keytab" in configurations["hive-site"]["properties"]) or \
+                    ("hive-site" not in services["configurations"]) or \
+                    ("hive-site" in services["configurations"] and "hive.server2.authentication.kerberos.keytab" in
+                        services["configurations"]["hive-site"]["properties"]):
+                putHiveSitePropertyAttribute("hive.server2.authentication.kerberos.keytab", "delete", "true")
+            if ("hive.server2.authentication.kerberos.principal" in configurations["hive-site"]["properties"]) or \
+                    ("hive-site" not in services["configurations"]) or \
+                    ("hive-site" in services["configurations"] and "hive.server2.authentication.kerberos.principal" in
+                        services["configurations"]["hive-site"]["properties"]):
+                putHiveSitePropertyAttribute("hive.server2.authentication.kerberos.principal", "delete", "true")
+
+        if hive_server2_auth == "pam":
+            putHiveSiteProperty("hive.server2.authentication.pam.services", "")
+        else:
+            if ("hive.server2.authentication.pam.services" in configurations["hive-site"]["properties"]) or \
+                    ("hive-site" not in services["configurations"]) or \
+                    ("hive-site" in services["configurations"] and "hive.server2.authentication.pam.services" in
+                        services["configurations"]["hive-site"]["properties"]):
+                putHiveSitePropertyAttribute("hive.server2.authentication.pam.services", "delete", "true")
+
+        if hive_server2_auth == "custom":
+            putHiveSiteProperty("hive.server2.custom.authentication.class", "")
+        else:
+            if ("hive.server2.authentication" in configurations["hive-site"]["properties"]) or \
+                    ("hive-site" not in services["configurations"]) or \
+                    ("hive-site" in services["configurations"] and "hive.server2.custom.authentication.class" in
+                        services["configurations"]["hive-site"]["properties"]):
+                putHiveSitePropertyAttribute("hive.server2.custom.authentication.class", "delete", "true")
+
+        # HiveServer, Client, Metastore heapsize
+        hs_heapsize_multiplier = 3.0 / 8
+        hm_heapsize_multiplier = 1.0 / 8
+        # HiveServer2 and HiveMetastore located on the same host
+        hive_server_hosts = self.getHostsWithComponent("HIVE", "HIVE_SERVER", services, hosts)
+        hive_client_hosts = self.getHostsWithComponent("HIVE", "HIVE_CLIENT", services, hosts)
+
+        if hive_server_hosts is not None and len(hive_server_hosts):
+            hs_host_ram = hive_server_hosts[0]["Hosts"]["total_mem"] / 1024
+            putHiveEnvProperty("hive.metastore.heapsize", max(512, int(hs_host_ram * hm_heapsize_multiplier)))
+            putHiveEnvProperty("hive.heapsize", max(512, int(hs_host_ram * hs_heapsize_multiplier)))
+            putHiveEnvPropertyAttributes("hive.metastore.heapsize", "maximum", max(1024, hs_host_ram))
+            putHiveEnvPropertyAttributes("hive.heapsize", "maximum", max(1024, hs_host_ram))
+
+        if hive_client_hosts is not None and len(hive_client_hosts):
+            putHiveEnvProperty("hive.client.heapsize", 1024)
+            putHiveEnvPropertyAttributes("hive.client.heapsize", "maximum",
+                                         max(1024, int(hive_client_hosts[0]["Hosts"]["total_mem"] / 1024)))
+        #####################################
+        #end of Hive 2.2 stack advisor
+
+        #Hive 2.3 stack advisor
+        #####################################
+
         # hive_security_authorization == 'ranger'
         if str(configurations["hive-env"]["properties"]["hive_security_authorization"]).lower() == "ranger":
-            putHiveServerProperty("hive.security.authorization.manager",
-                                  "org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory")
+            putHiveServerProperty("hive.security.authorization.manager", "org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory")
+
+        # TEZ JVM options
+        jvmGCParams = "-XX:+UseParallelGC"
+        if "ambari-server-properties" in services and "java.home" in services["ambari-server-properties"]:
+            # JDK8 needs different parameters
+            match = re.match(".*\/jdk(1\.\d+)[\-\_\.][^/]*$", services["ambari-server-properties"]["java.home"])
+            if match and len(match.groups()) > 0:
+                # Is version >= 1.8
+                versionSplits = re.split("\.", match.group(1))
+                if versionSplits and len(versionSplits) > 1 and int(versionSplits[0]) > 0 and int(
+                        versionSplits[1]) > 7:
+                    jvmGCParams = "-XX:+UseG1GC -XX:+ResizeTLAB"
+        putHiveSiteProperty('hive.tez.java.opts',
+                            "-server -Djava.net.preferIPv4Stack=true -XX:NewRatio=8 -XX:+UseNUMA " + jvmGCParams + " -XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps")
+
+        # if hive using sqla db, then we should add DataNucleus property
+        sqla_db_used = 'hive-env' in services['configurations'] and 'hive_database' in \
+                       services['configurations']['hive-env']['properties'] and \
+                       services['configurations']['hive-env']['properties']['hive_database'] == 'Existing SQL Anywhere Database'
+        if sqla_db_used:
+            putHiveSiteProperty('datanucleus.rdbms.datastoreAdapterClassName', 'org.datanucleus.store.rdbms.adapter.SQLAnywhereAdapter')
+        else:
+            putHiveSitePropertyAttribute('datanucleus.rdbms.datastoreAdapterClassName', 'delete', 'true')
+
+
+        #####################################
+        #end of Hive 2.3 stack advisor
+
+        #Hive 2.5 stack advisor
+        #####################################
+
+        # For 'Hive Server Interactive', if the component exists.
+        hsi_hosts = self.__getHostsForComponent(services, "HIVE", "HIVE_SERVER_INTERACTIVE")
+        if len(hsi_hosts) > 0:
+            hsi_host = hsi_hosts[0]
+            putHiveInteractiveEnvProperty('enable_hive_interactive', 'true')
+            putHiveInteractiveEnvProperty('hive_server_interactive_host', hsi_host)
+
+            # Update 'hive.llap.daemon.queue.name' property attributes if capacity scheduler is changed.
+            if self.HIVE_INTERACTIVE_SITE in services['configurations']:
+                if 'hive.llap.daemon.queue.name' in services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+                    self.setLlapDaemonQueuePropAttributesAndCapSliderVisibility(services, configurations)
+
+                    # Update 'hive.server2.tez.default.queues' value
+                    hive_tez_default_queue = None
+                    if 'hive-interactive-site' in configurations and 'hive.llap.daemon.queue.name' in configurations[self.HIVE_INTERACTIVE_SITE]['properties']:
+                        hive_tez_default_queue = configurations[self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+                        Logger.info("'hive.llap.daemon.queue.name' value from configurations : '{0}'".format(hive_tez_default_queue))
+                    if not hive_tez_default_queue:
+                        hive_tez_default_queue = services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+                        Logger.info("'hive.llap.daemon.queue.name' value from services : '{0}'".format(hive_tez_default_queue))
+                    if hive_tez_default_queue:
+                        putHiveInteractiveSiteProperty("hive.server2.tez.default.queues", hive_tez_default_queue)
+                        Logger.info("Updated 'hive.server2.tez.default.queues' config : '{0}'".format(hive_tez_default_queue))
+        else:
+            putHiveInteractiveEnvProperty('enable_hive_interactive', 'false')
+            putHiveInteractiveEnvPropertyAttribute("llap_queue_capacity", "visible", "false")
+
+        if self.HIVE_INTERACTIVE_SITE in services['configurations'] and 'hive.llap.zk.sm.connectionString' in \
+                        services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+            # Fill the property 'hive.llap.zk.sm.connectionString' required by Hive Server Interactive (HiveServer2)
+            zookeeper_host_port = self.getZKHostPortString(services)
+            if zookeeper_host_port:
+                putHiveInteractiveSiteProperty("hive.llap.zk.sm.connectionString", zookeeper_host_port)
+        pass
+
+        #####################################
+        #end of Hive 2.5 stack advisor
+
 
 
     def getAmsMemoryRecommendation(self, services, hosts):
@@ -1269,8 +1650,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
         amsCollectorHosts = self.getComponentHostNames(services, "AMBARI_METRICS", "METRICS_COLLECTOR")
 
-        if 'cluster-env' in services['configurations'] and \
-                        'metrics_collector_vip_host' in services['configurations']['cluster-env']['properties']:
+        if 'cluster-env' in services['configurations'] and 'metrics_collector_vip_host' in services['configurations']['cluster-env']['properties']:
             metric_collector_host = services['configurations']['cluster-env']['properties']['metrics_collector_vip_host']
         else:
             metric_collector_host = 'localhost' if len(amsCollectorHosts) == 0 else amsCollectorHosts[0]
@@ -1284,8 +1664,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             putHbaseEnvProperty("hbase_log_dir", log_dir)
 
         defaultFs = 'file:///'
-        if "core-site" in services["configurations"] and \
-                        "fs.defaultFS" in services["configurations"]["core-site"]["properties"]:
+        if "core-site" in services["configurations"] and "fs.defaultFS" in services["configurations"]["core-site"]["properties"]:
             defaultFs = services["configurations"]["core-site"]["properties"]["fs.defaultFS"]
 
         operatingMode = "embedded"
@@ -1629,7 +2008,9 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             "HIVE": {"hiveserver2-site": self.validateHiveServer2Configurations,
                      "hive-site": self.validateHiveConfigurations,
                      "hive-env": self.validateHiveConfigurationsEnv,
-                     "webhcat-site": self.validateWebhcatConfigurations},
+                     "webhcat-site": self.validateWebhcatConfigurations,
+                     "hive-interactive-env": self.validateHiveInteractiveEnvConfigurations,
+                     "hive-interactive-site": self.validateHiveInteractiveSiteConfigurations},
             "HBASE": {"hbase-env": self.validateHbaseEnvConfigurations,
                       "ranger-hbase-plugin-properties": self.validateHBASERangerPluginConfigurations},
             "STORM": {"storm-site": self.validateStormConfigurations,
@@ -1640,7 +2021,8 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             "AMBARI_METRICS": {"ams-hbase-site": self.validateAmsHbaseSiteConfigurations,
                                "ams-hbase-env": self.validateAmsHbaseEnvConfigurations,
                                "ams-site": self.validateAmsSiteConfigurations,
-                               "ams-env": self.validateAmsEnvConfigurations}
+                               "ams-env": self.validateAmsEnvConfigurations},
+            "KAKFA": {"kafka-broker": self.validateKAFKAConfigurations}
         }
 
     def validateMinMax(self, items, recommendedDefaults, configurations):
@@ -2198,15 +2580,23 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                             {"config-name": 'yarn.nodemanager.linux-container-executor.group', "item": self.validatorEqualsPropertyItem(properties, "yarn.nodemanager.linux-container-executor.group", clusterEnv, "user_group")},
                             {"config-name": 'yarn.scheduler.maximum-allocation-mb', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'yarn.scheduler.maximum-allocation-mb')} ]
         yarn_site = properties
+
+        yarn_site_properties = getSiteProperties(configurations, "yarn-site")
+        hsi_hosts = self.__getHostsForComponent(services, "HIVE", "HIVE_SERVER_INTERACTIVE")
+        if len(hsi_hosts) > 0:
+            # HIVE_SERVER_INTERACTIVE is mapped to a host
+            if 'yarn.resourcemanager.work-preserving-recovery.enabled' not in yarn_site_properties or \
+                            'true' != yarn_site_properties['yarn.resourcemanager.work-preserving-recovery.enabled']:
+                validationItems.append({"config-name": "yarn.resourcemanager.work-preserving-recovery.enabled",
+                                        "item": self.getWarnItem("While enabling HIVE_SERVER_INTERACTIVE it is recommended that you enable work preserving restart in YARN.")})
+
         servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
         if 'RANGER_KMS' in servicesList and 'KERBEROS' in servicesList:
             yarn_resource_proxy_enabled = yarn_site['yarn.resourcemanager.proxy-user-privileges.enabled']
             if yarn_resource_proxy_enabled.lower() == 'true':
-                validationItems.append({"config-name": 'yarn.resourcemanager.proxy-user-privileges.enabled',
-                                        "item": self.getWarnItem(
+                validationItems.append({"config-name": 'yarn.resourcemanager.proxy-user-privileges.enabled', "item": self.getWarnItem(
                                             "If Ranger KMS service is installed set yarn.resourcemanager.proxy-user-privileges.enabled " \
-                                            "property value as false under yarn-site"
-                                            )})
+                                            "property value as false under yarn-site")})
         return self.toConfigurationValidationProblems(validationItems, "yarn-site")
 
     def validateYARNEnvConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
@@ -2222,8 +2612,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             ranger_env = getServicesSiteProperties(services, 'ranger-env')
             if not ranger_env or not 'ranger-yarn-plugin-enabled' in ranger_env or ranger_env['ranger-yarn-plugin-enabled'].lower() != 'yes':
                 validationItems.append({"config-name": 'ranger-yarn-plugin-enabled',
-                                        "item": self.getWarnItem(
-                                            "ranger-yarn-plugin-properties/ranger-yarn-plugin-enabled must correspond ranger-env/ranger-yarn-plugin-enabled")})
+                                        "item": self.getWarnItem("ranger-yarn-plugin-properties/ranger-yarn-plugin-enabled must correspond ranger-env/ranger-yarn-plugin-enabled")})
         return self.toConfigurationValidationProblems(validationItems, "ranger-yarn-plugin-properties")
 
     def validateRangerConfigurationsEnv(self, properties, recommendedDefaults, configurations, services, hosts):
@@ -2235,13 +2624,11 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         if "ranger-storm-plugin-enabled" in ranger_env_properties and ranger_env_properties[
             'ranger-storm-plugin-enabled'].lower() == 'yes' and not 'KERBEROS' in servicesList:
             validationItems.append({"config-name": "ranger-storm-plugin-enabled",
-                                    "item": self.getWarnItem(
-                                        "Ranger Storm plugin should not be enabled in non-kerberos environment.")})
+                                    "item": self.getWarnItem("Ranger Storm plugin should not be enabled in non-kerberos environment.")})
         if "ranger-kafka-plugin-enabled" in ranger_env_properties and ranger_env_properties[
             "ranger-kafka-plugin-enabled"].lower() == 'yes' and not security_enabled:
             validationItems.append({"config-name": "ranger-kafka-plugin-enabled",
-                                    "item": self.getWarnItem(
-                                        "Ranger Kafka plugin should not be enabled in non-kerberos environment.")})
+                                    "item": self.getWarnItem("Ranger Kafka plugin should not be enabled in non-kerberos environment.")})
 
         return self.toConfigurationValidationProblems(validationItems, "ranger-env")
 
@@ -2253,8 +2640,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             policymgr_mgr_url = ranger_site['policymgr_external_url']
             if policymgr_mgr_url.endswith('/'):
                 validationItems.append({'config-name': 'policymgr_external_url',
-                                        'item': self.getWarnItem(
-                                            'Ranger External URL should not contain trailing slash "/"')})
+                                        'item': self.getWarnItem('Ranger External URL should not contain trailing slash "/"')})
         return self.toConfigurationValidationProblems(validationItems, 'admin-properties')
 
     def validateRangerTagsyncConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
@@ -2280,8 +2666,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         # Adding Ranger Plugin logic here
         ranger_plugin_properties = getSiteProperties(configurations, "ranger-hive-plugin-properties")
         hive_env_properties = getSiteProperties(configurations, "hive-env")
-        ranger_plugin_enabled = 'hive_security_authorization' in hive_env_properties and hive_env_properties[
-                                                                                             'hive_security_authorization'].lower() == 'ranger'
+        ranger_plugin_enabled = 'hive_security_authorization' in hive_env_properties and hive_env_properties['hive_security_authorization'].lower() == 'ranger'
         servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
 
         ##Add stack validations only if Ranger is enabled.
@@ -2291,27 +2676,21 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 prop_name = 'hive.security.authorization.manager'
                 prop_val = "org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory"
                 if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
-                    validationItems.append({"config-name": prop_name,
-                                            "item": self.getWarnItem(
-                                                "If Ranger Hive Plugin is enabled." \
-                                                " {0} under hiveserver2-site needs to be set to {1}".format(prop_name,
-                                                                                                            prop_val))})
+                    validationItems.append({"config-name": prop_name,"item": self.getWarnItem(
+                                            "If Ranger Hive Plugin is enabled." \
+                                            " {0} under hiveserver2-site needs to be set to {1}".format(prop_name, prop_val))})
                 prop_name = 'hive.security.authenticator.manager'
                 prop_val = "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator"
                 if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
-                    validationItems.append({"config-name": prop_name,
-                                            "item": self.getWarnItem(
-                                                "If Ranger Hive Plugin is enabled." \
-                                                " {0} under hiveserver2-site needs to be set to {1}".format(prop_name,
-                                                                                                            prop_val))})
+                    validationItems.append({"config-name": prop_name,"item": self.getWarnItem(
+                                            "If Ranger Hive Plugin is enabled." \
+                                            " {0} under hiveserver2-site needs to be set to {1}".format(prop_name, prop_val))})
                 prop_name = 'hive.security.authorization.enabled'
                 prop_val = 'true'
                 if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
-                    validationItems.append({"config-name": prop_name,
-                                            "item": self.getWarnItem(
-                                                "If Ranger Hive Plugin is enabled." \
-                                                " {0} under hiveserver2-site needs to be set to {1}".format(prop_name,
-                                                                                                            prop_val))})
+                    validationItems.append({"config-name": prop_name,"item": self.getWarnItem(
+                                            "If Ranger Hive Plugin is enabled." \
+                                            " {0} under hiveserver2-site needs to be set to {1}".format(prop_name, prop_val))})
                 prop_name = 'hive.conf.restricted.list'
                 prop_vals = 'hive.security.authorization.enabled,hive.security.authorization.manager,hive.security.authenticator.manager'.split(
                     ',')
@@ -2335,22 +2714,19 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 prop_name = 'hive.security.authorization.manager'
                 prop_val = "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory"
                 if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
-                    validationItems.append({"config-name": prop_name,
-                                            "item": self.getWarnItem(
+                    validationItems.append({"config-name": prop_name, "item": self.getWarnItem(
                                                 "If Ranger Hive Plugin is disabled." \
                                                 " {0} needs to be set to {1}".format(prop_name, prop_val))})
                 prop_name = 'hive.security.authenticator.manager'
                 prop_val = "org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator"
                 if prop_name in hive_server2 and hive_server2[prop_name] != prop_val:
-                    validationItems.append({"config-name": prop_name,
-                                            "item": self.getWarnItem(
+                    validationItems.append({"config-name": prop_name, "item": self.getWarnItem(
                                                 "If Ranger Hive Plugin is disabled." \
                                                 " {0} needs to be set to {1}".format(prop_name, prop_val))})
         return self.toConfigurationValidationProblems(validationItems, "hiveserver2-site")
 
     def validateWebhcatConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
-        validationItems = [{"config-name": 'templeton.hadoop.queue.name',
-                            "item": self.validatorYarnQueue(properties, recommendedDefaults,
+        validationItems = [{"config-name": 'templeton.hadoop.queue.name', "item": self.validatorYarnQueue(properties, recommendedDefaults,
                                                             'templeton.hadoop.queue.name', services)}]
         return self.toConfigurationValidationProblems(validationItems, "webhcat-site")
 
@@ -2358,21 +2734,17 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         validationItems = []
         hive_env = properties
         hive_site = getSiteProperties(configurations, "hive-site")
-        if "hive_security_authorization" in hive_env and \
-                        str(hive_env["hive_security_authorization"]).lower() == "none" \
+        if "hive_security_authorization" in hive_env and str(hive_env["hive_security_authorization"]).lower() == "none" \
                 and str(hive_site["hive.security.authorization.enabled"]).lower() == "true":
             authorization_item = self.getErrorItem("hive_security_authorization should not be None "
                                                    "if hive.security.authorization.enabled is set")
             validationItems.append({"config-name": "hive_security_authorization", "item": authorization_item})
-        if "hive_security_authorization" in hive_env and \
-                        str(hive_env["hive_security_authorization"]).lower() == "ranger":
+        if "hive_security_authorization" in hive_env and str(hive_env["hive_security_authorization"]).lower() == "ranger":
             # ranger-hive-plugin must be enabled in ranger-env
             ranger_env = getServicesSiteProperties(services, 'ranger-env')
-            if not ranger_env or not 'ranger-hive-plugin-enabled' in ranger_env or \
-                            ranger_env['ranger-hive-plugin-enabled'].lower() != 'yes':
-                validationItems.append({"config-name": 'hive_security_authorization',
-                                        "item": self.getWarnItem(
-                                            "ranger-env/ranger-hive-plugin-enabled must be enabled when hive_security_authorization is set to Ranger")})
+            if not ranger_env or not 'ranger-hive-plugin-enabled' in ranger_env or ranger_env['ranger-hive-plugin-enabled'].lower() != 'yes':
+                validationItems.append({"config-name": 'hive_security_authorization', "item": self.getWarnItem(
+                                        "ranger-env/ranger-hive-plugin-enabled must be enabled when hive_security_authorization is set to Ranger")})
         return self.toConfigurationValidationProblems(validationItems, "hive-env")
 
     def validateHiveConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
@@ -2380,12 +2752,8 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         validationItems = []
         stripe_size_values = [8388608, 16777216, 33554432, 67108864, 134217728, 268435456]
         stripe_size_property = "hive.exec.orc.default.stripe.size"
-        if stripe_size_property in properties and \
-                        int(properties[stripe_size_property]) not in stripe_size_values:
-            validationItems.append({"config-name": stripe_size_property,
-                                    "item": self.getWarnItem("Correct values are {0}".format(stripe_size_values))
-                                    }
-                                   )
+        if stripe_size_property in properties and int(properties[stripe_size_property]) not in stripe_size_values:
+            validationItems.append({"config-name": stripe_size_property, "item": self.getWarnItem("Correct values are {0}".format(stripe_size_values))})
         authentication_property = "hive.server2.authentication"
         ldap_baseDN_property = "hive.server2.authentication.ldap.baseDN"
         ldap_domain_property = "hive.server2.authentication.ldap.Domain"
@@ -2441,8 +2809,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             # ranger-hdfs-plugin must be enabled in ranger-env
             ranger_env = getServicesSiteProperties(services, 'ranger-env')
             if not ranger_env or not 'ranger-hbase-plugin-enabled' in ranger_env or ranger_env['ranger-hbase-plugin-enabled'].lower() != 'yes':
-                validationItems.append({"config-name": 'ranger-hbase-plugin-enabled',
-                                        "item": self.getWarnItem(
+                validationItems.append({"config-name": 'ranger-hbase-plugin-enabled', "item": self.getWarnItem(
                                             "ranger-hbase-plugin-properties/ranger-hbase-plugin-enabled must correspond ranger-env/ranger-hbase-plugin-enabled")})
         return self.toConfigurationValidationProblems(validationItems, "ranger-hbase-plugin-properties")
 
@@ -2504,8 +2871,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         if ("RANGER" in servicesList) and (ranger_plugin_enabled.lower() == 'Yes'.lower()):
             if 'dfs.namenode.inode.attributes.provider.class' not in hdfs_site or \
                 hdfs_site['dfs.namenode.inode.attributes.provider.class'].lower() != 'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer'.lower():
-                validationItems.append({"config-name": 'dfs.namenode.inode.attributes.provider.class',
-                                        "item": self.getWarnItem(
+                validationItems.append({"config-name": 'dfs.namenode.inode.attributes.provider.class', "item": self.getWarnItem(
                                             "dfs.namenode.inode.attributes.provider.class needs to be set to 'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer' if Ranger HDFS Plugin is enabled.")})
 
 
@@ -2617,6 +2983,165 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                                         "item": self.getWarnItem(
                                             "ranger-hdfs-plugin-properties/ranger-hdfs-plugin-enabled must correspond ranger-env/ranger-hdfs-plugin-enabled")})
         return self.toConfigurationValidationProblems(validationItems, "ranger-hdfs-plugin-properties")
+
+    """
+    Does the following validation checks for HIVE_SERVER_INTERACTIVE's hive-interactive-site configs.
+        1. Queue selected in 'hive.llap.daemon.queue.name' config should be sized >= to minimum required to run LLAP
+           and Hive2 app.
+        2. Queue selected in 'hive.llap.daemon.queue.name' config state should not be 'STOPPED'.
+        3. 'hive.server2.enable.doAs' config should be set to 'false' for Hive2.
+        4. 'Maximum Total Concurrent Queries'(hive.server2.tez.sessions.per.default.queue) should not consume more that 50% of selected queue for LLAP.
+        5. if 'llap' queue is selected, in order to run Service Checks, 'remaining available capacity' in cluster is atleast 512 MB.
+    """
+
+    def validateHiveInteractiveSiteConfigurations(self, properties, recommendedDefaults, configurations, services,
+                                                  hosts):
+        validationItems = []
+        hsi_hosts = self.__getHostsForComponent(services, "HIVE", "HIVE_SERVER_INTERACTIVE")
+        curr_selected_queue_for_llap = None
+        curr_selected_queue_for_llap_cap_perc = None
+        MIN_ASSUMED_CAP_REQUIRED_FOR_SERVICE_CHECKS = 512
+        current_selected_queue_for_llap_cap = None
+
+        if len(hsi_hosts) > 0:
+            # Get total cluster capacity
+            node_manager_host_list = self.get_node_manager_hosts(services, hosts)
+            node_manager_cnt = len(node_manager_host_list)
+            yarn_nm_mem_in_mb = self.get_yarn_nm_mem_in_mb(services, configurations)
+            total_cluster_capacity = node_manager_cnt * yarn_nm_mem_in_mb
+
+            capacity_scheduler_properties, received_as_key_value_pair = self.getCapacitySchedulerProperties(services)
+            if capacity_scheduler_properties:
+                if self.HIVE_INTERACTIVE_SITE in services['configurations'] and \
+                                'hive.llap.daemon.queue.name' in services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+                    curr_selected_queue_for_llap = services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+                    if curr_selected_queue_for_llap:
+                        current_selected_queue_for_llap_cap = self.__getSelectedQueueTotalCap(
+                            capacity_scheduler_properties,
+                            curr_selected_queue_for_llap, total_cluster_capacity)
+                        if current_selected_queue_for_llap_cap:
+                            curr_selected_queue_for_llap_cap_perc = int(
+                                current_selected_queue_for_llap_cap * 100 / total_cluster_capacity)
+                            min_reqd_queue_cap_perc = self.min_queue_perc_reqd_for_llap_and_hive_app(services, hosts,
+                                                                                                     configurations)
+
+                            # Validate that the selected queue in 'hive.llap.daemon.queue.name' should be sized >= to minimum required
+                            # to run LLAP and Hive2 app.
+                            if curr_selected_queue_for_llap_cap_perc < min_reqd_queue_cap_perc:
+                                errMsg1 = "Selected queue '{0}' capacity ({1}%) is less than minimum required capacity ({2}%) for LLAP " \
+                                          "app to run".format(curr_selected_queue_for_llap,
+                                                              curr_selected_queue_for_llap_cap_perc,
+                                                              min_reqd_queue_cap_perc)
+                                validationItems.append(
+                                    {"config-name": "hive.llap.daemon.queue.name", "item": self.getErrorItem(errMsg1)})
+                        else:
+                            Logger.error(
+                                "Couldn't retrieve '{0}' queue's capacity from 'capacity-scheduler' while doing validation checks for "
+                                "Hive Server Interactive.".format(curr_selected_queue_for_llap))
+
+                        # Validate that current selected queue in 'hive.llap.daemon.queue.name' state is not STOPPED.
+                        llap_selected_queue_state = self.__getQueueStateFromCapacityScheduler(
+                            capacity_scheduler_properties, curr_selected_queue_for_llap)
+                        if llap_selected_queue_state:
+                            if llap_selected_queue_state == "STOPPED":
+                                errMsg2 = "Selected queue '{0}' current state is : '{1}'. It is required to be in 'RUNNING' state for LLAP to run" \
+                                    .format(curr_selected_queue_for_llap, llap_selected_queue_state)
+                                validationItems.append(
+                                    {"config-name": "hive.llap.daemon.queue.name", "item": self.getErrorItem(errMsg2)})
+                        else:
+                            Logger.error(
+                                "Couldn't retrieve '{0}' queue's state from 'capacity-scheduler' while doing validation checks for "
+                                "Hive Server Interactive.".format(curr_selected_queue_for_llap))
+                    else:
+                        Logger.error(
+                            "Couldn't retrieve current selection for 'hive.llap.daemon.queue.name' while doing validation "
+                            "checks for Hive Server Interactive.")
+                else:
+                    Logger.error(
+                        "Couldn't retrieve 'hive.llap.daemon.queue.name' config from 'hive-interactive-site' while doing "
+                        "validation checks for Hive Server Interactive.")
+                    pass
+            else:
+                Logger.error(
+                    "Couldn't retrieve 'capacity-scheduler' properties while doing validation checks for Hive Server Interactive.")
+                pass
+
+            if self.HIVE_INTERACTIVE_SITE in services['configurations']:
+                # Validate that 'hive.server2.enable.doAs' config is not set to 'true' for Hive2.
+                if 'hive.server2.enable.doAs' in services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+                    hive2_enable_do_as = services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']['hive.server2.enable.doAs']
+                    if hive2_enable_do_as == 'true':
+                        validationItems.append({"config-name": "hive.server2.enable.doAs", "item": self.getErrorItem("Value should be set to 'false' for Hive2.")})
+
+                # Validate that 'Maximum Total Concurrent Queries'(hive.server2.tez.sessions.per.default.queue) is not consuming more that
+                # 50% of selected queue for LLAP.
+                if current_selected_queue_for_llap_cap and 'hive.server2.tez.sessions.per.default.queue' in \
+                        services['configurations']['hive-interactive-site']['properties']:
+                    num_tez_sessions = services['configurations']['hive-interactive-site']['properties']['hive.server2.tez.sessions.per.default.queue']
+                    if num_tez_sessions:
+                        num_tez_sessions = long(num_tez_sessions)
+                        yarn_min_container_size = self.get_yarn_min_container_size(services, configurations)
+                        tez_am_container_size = self.calculate_tez_am_container_size(long(total_cluster_capacity))
+                        normalized_tez_am_container_size = self._normalizeUp(tez_am_container_size,
+                                                                             yarn_min_container_size)
+                        llap_selected_queue_cap_remaining = current_selected_queue_for_llap_cap - (
+                        normalized_tez_am_container_size * num_tez_sessions)
+                        if llap_selected_queue_cap_remaining <= current_selected_queue_for_llap_cap / 2:
+                            errMsg3 = " Reducing the 'Maximum Total Concurrent Queries' (value: {0}) is advisable as it is consuming more than 50% of " \
+                                      "'{1}' queue for LLAP.".format(num_tez_sessions, curr_selected_queue_for_llap)
+                            validationItems.append({"config-name": "hive.server2.tez.sessions.per.default.queue",
+                                                    "item": self.getWarnItem(errMsg3)})
+
+            # Validate that 'remaining available capacity' in cluster is atleast 512 MB, after 'llap' queue is selected,
+            # in order to run Service Checks.
+            if curr_selected_queue_for_llap and curr_selected_queue_for_llap_cap_perc and \
+                            curr_selected_queue_for_llap == self.AMBARI_MANAGED_LLAP_QUEUE_NAME:
+                curr_selected_queue_for_llap_cap = float(
+                    curr_selected_queue_for_llap_cap_perc) / 100 * total_cluster_capacity
+                available_cap_in_cluster = total_cluster_capacity - curr_selected_queue_for_llap_cap
+                if available_cap_in_cluster < MIN_ASSUMED_CAP_REQUIRED_FOR_SERVICE_CHECKS:
+                    errMsg4 = "Capacity used by '{0}' queue is '{1}'. Service checks may not run as remaining available capacity " \
+                              "({2}) in cluster is less than 512 MB.".format(self.AMBARI_MANAGED_LLAP_QUEUE_NAME,
+                                                                             curr_selected_queue_for_llap_cap,
+                                                                             available_cap_in_cluster)
+                    validationItems.append({"config-name": "hive.llap.daemon.queue.name", "item": self.getWarnItem(errMsg4)})
+
+        validationProblems = self.toConfigurationValidationProblems(validationItems, "hive-interactive-site")
+        return validationProblems
+
+    def validateHiveInteractiveEnvConfigurations(self, properties, recommendedDefaults, configurations, services,
+                                                 hosts):
+        hive_site_env_properties = getSiteProperties(configurations, "hive-interactive-env")
+        validationItems = []
+        hsi_hosts = self.__getHostsForComponent(services, "HIVE", "HIVE_SERVER_INTERACTIVE")
+        if len(hsi_hosts) > 0:
+            # HIVE_SERVER_INTERACTIVE is mapped to a host
+            if 'enable_hive_interactive' not in hive_site_env_properties or ('enable_hive_interactive' in hive_site_env_properties and hive_site_env_properties[
+                        'enable_hive_interactive'].lower() != 'true'):
+                validationItems.append({"config-name": "enable_hive_interactive", "item": self.getErrorItem(
+                                            "HIVE_SERVER_INTERACTIVE requires enable_hive_interactive in hive-interactive-env set to true.")})
+            if 'hive_server_interactive_host' in hive_site_env_properties:
+                hsi_host = hsi_hosts[0]
+                if hive_site_env_properties['hive_server_interactive_host'].lower() != hsi_host.lower():
+                    validationItems.append({"config-name": "hive_server_interactive_host", "item": self.getErrorItem(
+                                                "HIVE_SERVER_INTERACTIVE requires hive_server_interactive_host in hive-interactive-env set to its host name.")})
+                pass
+            if 'hive_server_interactive_host' not in hive_site_env_properties:
+                validationItems.append({"config-name": "hive_server_interactive_host", "item": self.getErrorItem(
+                                            "HIVE_SERVER_INTERACTIVE requires hive_server_interactive_host in hive-interactive-env set to its host name.")})
+                pass
+
+        else:
+            # no  HIVE_SERVER_INTERACTIVE
+            if 'enable_hive_interactive' in hive_site_env_properties and hive_site_env_properties[
+                'enable_hive_interactive'].lower() != 'false':
+                validationItems.append({"config-name": "enable_hive_interactive", "item": self.getErrorItem(
+                                            "enable_hive_interactive in hive-interactive-env should be set to false.")})
+                pass
+            pass
+
+        validationProblems = self.toConfigurationValidationProblems(validationItems, "hive-interactive-env")
+        return validationProblems
 
     def validatorOneDataDirPerPartition(self, properties, propertyName, services, hosts, clusterEnv):
         if not propertyName in properties:
@@ -2964,6 +3489,1018 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         }
         return driverDict.get(databaseType.upper())
 
+
+    """
+    Entry point for updating Hive's 'LLAP app' configs namely : (1). num_llap_nodes (2). hive.llap.daemon.yarn.container.mb
+    (3). hive.llap.daemon.num.executors (4). hive.llap.io.memory.size (5). llap_heap_size (6). slider_am_container_mb,
+    and (7). hive.server2.tez.sessions.per.default.queue
+
+      The trigger point for updating LLAP configs (mentioned above) is change in values of any of the following:
+      (1). 'enable_hive_interactive' set to 'true' (2). 'llap_queue_capacity' (3). 'hive.server2.tez.sessions.per.default.queue'
+      (4). Change in queue selection for config 'hive.llap.daemon.queue.name'.
+
+      If change in value for 'llap_queue_capacity' or 'hive.server2.tez.sessions.per.default.queue' is detected, that config
+      value is not calulated, but read and use in calculation for dependent configs.
+    """
+
+    def updateLlapConfigs(self, configurations, services, hosts, llap_queue_name):
+        putHiveInteractiveSiteProperty = self.putProperty(configurations, self.HIVE_INTERACTIVE_SITE, services)
+        putHiveInteractiveSitePropertyAttribute = self.putPropertyAttribute(configurations, self.HIVE_INTERACTIVE_SITE)
+
+        putHiveInteractiveEnvProperty = self.putProperty(configurations, "hive-interactive-env", services)
+        putHiveInteractiveEnvPropertyAttribute = self.putPropertyAttribute(configurations, "hive-interactive-env")
+
+        putTezInteractiveSiteProperty = self.putProperty(configurations, "tez-interactive-site", services)
+
+        llap_daemon_selected_queue_name = None
+        llap_queue_selected_in_current_call = None
+        LLAP_MAX_CONCURRENCY = 32  # Allow a max of 32 concurrency.
+
+        # Update 'hive.llap.daemon.queue.name' prop combo entries and llap capacity slider visibility.
+        self.setLlapDaemonQueuePropAttributesAndCapSliderVisibility(services, configurations)
+
+        if not services["changed-configurations"]:
+          read_llap_daemon_yarn_cont_mb = long(self.get_yarn_min_container_size(services, configurations))
+          putHiveInteractiveSiteProperty('hive.llap.daemon.yarn.container.mb', read_llap_daemon_yarn_cont_mb)
+          # initial memory setting to make sure hive.llap.daemon.yarn.container.mb >= yarn.scheduler.minimum-allocation-mb
+          Logger.info("Adjusted 'hive.llap.daemon.yarn.container.mb' to yarn min container size as initial size "
+                      "(" + str(self.get_yarn_min_container_size(services, configurations)) + " MB).")
+
+        try:
+            if self.HIVE_INTERACTIVE_SITE in services['configurations'] and 'hive.llap.daemon.queue.name' in services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+              llap_daemon_selected_queue_name = services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+
+            if 'hive.llap.daemon.queue.name' in configurations[self.HIVE_INTERACTIVE_SITE]['properties']:
+              llap_queue_selected_in_current_call = configurations[self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+
+            # Update Visibility of 'llap_queue_capacity' slider.
+            capacity_scheduler_properties, received_as_key_value_pair = self.getCapacitySchedulerProperties(services)
+            if capacity_scheduler_properties:
+                # Get all leaf queues.
+                leafQueueNames = self.getAllYarnLeafQueues(capacity_scheduler_properties)
+                if len(leafQueueNames) == 2 and \
+                  (llap_daemon_selected_queue_name != None and llap_daemon_selected_queue_name == llap_queue_name) or \
+                  (llap_queue_selected_in_current_call != None and llap_queue_selected_in_current_call == llap_queue_name):
+                    putHiveInteractiveEnvPropertyAttribute("llap_queue_capacity", "visible", "true")
+                    Logger.info("Selected YARN queue is '{0}'. Setting LLAP queue capacity slider visibility to 'True'".format(llap_queue_name))
+                else:
+                    putHiveInteractiveEnvPropertyAttribute("llap_queue_capacity", "visible", "false")
+                    Logger.info("Queue selected for LLAP app is : '{0}'. Current YARN queues : {1}. Setting '{2}' queue capacity slider "
+                                "visibility to 'False'.".format(llap_daemon_selected_queue_name, list(leafQueueNames), llap_queue_name))
+                if llap_daemon_selected_queue_name:
+                    llap_selected_queue_state = self.__getQueueStateFromCapacityScheduler(capacity_scheduler_properties, llap_daemon_selected_queue_name)
+                    if llap_selected_queue_state == None or llap_selected_queue_state == "STOPPED":
+                        putHiveInteractiveEnvPropertyAttribute("llap_queue_capacity", "visible", "false")
+                        raise Fail("Selected LLAP app queue '{0}' current state is : '{1}'. Setting LLAP configs to default values "
+                                   "and 'llap' queue capacity slider visibility to 'False'."
+                                   .format(llap_daemon_selected_queue_name, llap_selected_queue_state))
+                else:
+                    raise Fail("Retrieved LLAP app queue name is : '{0}'. Setting LLAP configs to default values."
+                               .format(llap_daemon_selected_queue_name))
+            else:
+                Logger.error("Couldn't retrieve 'capacity-scheduler' properties while doing YARN queue adjustment for Hive Server Interactive."
+                             " Not calculating LLAP configs.")
+                return
+
+            changed_configs_in_hive_int_env = None
+            llap_concurrency_in_changed_configs = None
+            llap_daemon_queue_in_changed_configs = None
+            # Calculations are triggered only if there is change in any one of the following props :
+            # 'llap_queue_capacity', 'enable_hive_interactive', 'hive.server2.tez.sessions.per.default.queue'
+            # or 'hive.llap.daemon.queue.name' has change in value selection.
+            # OR
+            # services['changed-configurations'] is empty implying that this is the Blueprint call. (1st invocation)
+            if 'changed-configurations' in services.keys():
+              config_names_to_be_checked = set(['llap_queue_capacity', 'enable_hive_interactive'])
+              changed_configs_in_hive_int_env = self.are_config_props_in_changed_configs(services, "hive-interactive-env",
+                                                                                         config_names_to_be_checked, False)
+
+              # Determine if there is change detected in "hive-interactive-site's" configs based on which we calculate llap configs.
+              llap_concurrency_in_changed_configs = self.are_config_props_in_changed_configs(services, "hive-interactive-site",
+                                                                                             set(['hive.server2.tez.sessions.per.default.queue']), False)
+
+              llap_daemon_queue_in_changed_configs = self.are_config_props_in_changed_configs(services, "hive-interactive-site",
+                                                                                              set(['hive.llap.daemon.queue.name']), False)
+
+            if not changed_configs_in_hive_int_env and \
+              not llap_concurrency_in_changed_configs and \
+              not llap_daemon_queue_in_changed_configs and \
+              services["changed-configurations"]:
+              Logger.info("LLAP parameters not modified. Not adjusting LLAP configs.")
+              Logger.info("Current 'changed-configuration' received is : {0}".format(services["changed-configurations"]))
+              return
+
+            node_manager_host_list = self.get_node_manager_hosts(services, hosts)
+            node_manager_cnt = len(node_manager_host_list)
+            yarn_nm_mem_in_mb = self.get_yarn_nm_mem_in_mb(services, configurations)
+            total_cluster_capacity = node_manager_cnt * yarn_nm_mem_in_mb
+            Logger.info("\n\nCalculated total_cluster_capacity : {0}, using following : node_manager_cnt : {1}, "
+                        "yarn_nm_mem_in_mb : {2}".format(total_cluster_capacity, node_manager_cnt,
+                                                         yarn_nm_mem_in_mb))
+
+            # Check which queue is selected in 'hive.llap.daemon.queue.name', to determine current queue capacity
+            current_selected_queue_for_llap_cap = None
+            yarn_root_queues = capacity_scheduler_properties.get("yarn.scheduler.capacity.root.queues")
+            if llap_queue_selected_in_current_call == llap_queue_name \
+                    or llap_daemon_selected_queue_name == llap_queue_name \
+                            and (llap_queue_name in yarn_root_queues and len(leafQueueNames) == 2):
+                current_selected_queue_for_llap_cap_perc = self.get_llap_cap_percent_slider(services,
+                                                                                            configurations)
+                current_selected_queue_for_llap_cap = current_selected_queue_for_llap_cap_perc / 100 * total_cluster_capacity
+            else:  # any queue other than 'llap'
+                current_selected_queue_for_llap_cap = self.__getSelectedQueueTotalCap(capacity_scheduler_properties,
+                                                                                      llap_daemon_selected_queue_name,
+                                                                                      total_cluster_capacity)
+            assert (
+            current_selected_queue_for_llap_cap >= 1), "Current selected queue '{0}' capacity value : {1}. Expected value : >= 1" \
+                .format(llap_daemon_selected_queue_name, current_selected_queue_for_llap_cap)
+            yarn_min_container_size = self.get_yarn_min_container_size(services, configurations)
+            tez_am_container_size = self.calculate_tez_am_container_size(long(total_cluster_capacity))
+            normalized_tez_am_container_size = self._normalizeUp(tez_am_container_size, yarn_min_container_size)
+            Logger.info("Calculated normalized_tez_am_container_size : {0}, using following : tez_am_container_size : {1}, "
+                "total_cluster_capacity : {2}".format(normalized_tez_am_container_size, tez_am_container_size, total_cluster_capacity))
+            normalized_selected_queue_for_llap_cap = long(self._normalizeDown(current_selected_queue_for_llap_cap, yarn_min_container_size))
+
+            # Get calculated value for Slider AM container Size
+            slider_am_container_size = self._normalizeUp(self.calculate_slider_am_size(yarn_min_container_size),
+                                                         yarn_min_container_size)
+
+            # Read 'hive.server2.tez.sessions.per.default.queue' prop if it's in changed-configs, else calculate it.
+            if not llap_concurrency_in_changed_configs:
+                # Calculate llap concurrency (i.e. Number of Tez AM's)
+                llap_concurrency = float(normalized_selected_queue_for_llap_cap * 0.25 / normalized_tez_am_container_size)
+                llap_concurrency = max(long(llap_concurrency), 1)
+                Logger.info("Calculated llap_concurrency : {0}, using following : normalized_selected_queue_for_llap_cap : {1}, "
+                    "normalized_tez_am_container_size : {2}".format(llap_concurrency, normalized_selected_queue_for_llap_cap, normalized_tez_am_container_size))
+                # Limit 'llap_concurrency' to reach a max. of 32.
+                if llap_concurrency > LLAP_MAX_CONCURRENCY:
+                    llap_concurrency = LLAP_MAX_CONCURRENCY
+            else:
+                # Read current value
+                if 'hive.server2.tez.sessions.per.default.queue' in services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+                    llap_concurrency = long(services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']['hive.server2.tez.sessions.per.default.queue'])
+                    assert (llap_concurrency >= 1), "'hive.server2.tez.sessions.per.default.queue' current value : {0}. Expected value : >= 1" \
+                        .format(llap_concurrency)
+                else:
+                    raise Fail("Couldn't retrieve Hive Server interactive's 'hive.server2.tez.sessions.per.default.queue' config.")
+
+            # Calculate 'total memory available for llap daemons' across cluster
+            total_am_capacity_required = normalized_tez_am_container_size * llap_concurrency + slider_am_container_size
+            cap_available_for_daemons = normalized_selected_queue_for_llap_cap - total_am_capacity_required
+            Logger.info(
+                "Calculated cap_available_for_daemons : {0}, using following : current_selected_queue_for_llap_cap : {1}, "
+                "yarn_nm_mem_in_mb : {2}, total_cluster_capacity : {3}, normalized_selected_queue_for_llap_cap : {4}, normalized_tez_am_container_size"
+                " : {5}, yarn_min_container_size : {6}, llap_concurrency : {7}, total_am_capacity_required : {8}"
+                    .format(cap_available_for_daemons, current_selected_queue_for_llap_cap, yarn_nm_mem_in_mb,
+                            total_cluster_capacity, normalized_selected_queue_for_llap_cap, normalized_tez_am_container_size,
+                            yarn_min_container_size, llap_concurrency, total_am_capacity_required))
+            if cap_available_for_daemons < yarn_min_container_size:
+                raise Fail(
+                    "'Capacity available for LLAP daemons'({0}) < 'YARN minimum container size'({1}). Invalid configuration detected. "
+                    "Increase LLAP queue size.".format(cap_available_for_daemons, yarn_min_container_size))
+
+            # Calculate value for 'num_llap_nodes', an across cluster config.
+            # Also, get calculated value for 'hive.llap.daemon.yarn.container.mb' based on 'num_llap_nodes' value, a per node config.
+            num_llap_nodes_raw = cap_available_for_daemons / yarn_nm_mem_in_mb
+            if num_llap_nodes_raw < 1.00:
+                # Set the llap nodes to min. value of 1 and 'llap_container_size' to min. YARN allocation.
+                num_llap_nodes = 1
+                llap_container_size = self._normalizeUp(cap_available_for_daemons, yarn_min_container_size)
+                Logger.info("Calculated llap_container_size : {0}, using following : cap_available_for_daemons : {1}, "
+                    "yarn_min_container_size : {2}".format(llap_container_size, cap_available_for_daemons, yarn_min_container_size))
+            else:
+                num_llap_nodes = math.floor(num_llap_nodes_raw)
+                llap_container_size = self._normalizeDown(yarn_nm_mem_in_mb, yarn_min_container_size)
+                Logger.info("Calculated llap_container_size : {0}, using following : yarn_nm_mem_in_mb : {1}, "
+                            "yarn_min_container_size : {2}".format(llap_container_size, yarn_nm_mem_in_mb, yarn_min_container_size))
+            Logger.info("Calculated num_llap_nodes : {0} using following : yarn_nm_mem_in_mb : {1}, cap_available_for_daemons : {2} " \
+                        .format(num_llap_nodes, yarn_nm_mem_in_mb, cap_available_for_daemons))
+
+            # Calculate value for 'hive.llap.daemon.num.executors', a per node config.
+            hive_tez_container_size = self.get_hive_tez_container_size(services, configurations)
+            if 'yarn.nodemanager.resource.cpu-vcores' in services['configurations']['yarn-site']['properties']:
+                cpu_per_nm_host = float(services['configurations']['yarn-site']['properties']['yarn.nodemanager.resource.cpu-vcores'])
+                assert (cpu_per_nm_host > 0), "'yarn.nodemanager.resource.cpu-vcores' current value : {0}. Expected value : > 0".format(cpu_per_nm_host)
+            else:
+                raise Fail("Couldn't retrieve YARN's 'yarn.nodemanager.resource.cpu-vcores' config.")
+
+            num_executors_per_node_raw = math.floor(llap_container_size / hive_tez_container_size)
+            num_executors_per_node = min(num_executors_per_node_raw, cpu_per_nm_host)
+            Logger.info("calculated num_executors_per_node: {0}, using following :  hive_tez_container_size : {1}, "
+                        "cpu_per_nm_host : {2}, num_executors_per_node_raw : {3}, llap_container_size : {4}"
+                        .format(num_executors_per_node, hive_tez_container_size, cpu_per_nm_host, num_executors_per_node_raw, llap_container_size))
+            assert (num_executors_per_node >= 0), "'Number of executors per node' : {0}. Expected value : > 0".format(num_executors_per_node)
+
+            total_mem_for_executors = num_executors_per_node * hive_tez_container_size
+
+            # Calculate value for 'cache' (hive.llap.io.memory.size), a per node config.
+            cache_size_per_node = llap_container_size - total_mem_for_executors
+            Logger.info("Calculated cache_size_per_node : {0} using following : hive_container_size : {1}, llap_container_size"
+                        " : {2}, num_executors_per_node : {3}".format(cache_size_per_node, hive_tez_container_size, llap_container_size, num_executors_per_node))
+            if cache_size_per_node < 0:  # Run with '0' cache.
+                Logger.info("Calculated 'cache_size_per_node' : {0}. Setting 'cache_size_per_node' to 0.".format(cache_size_per_node))
+                cache_size_per_node = 0
+
+            # Calculate value for prop 'llap_heap_size'
+            llap_xmx = max(total_mem_for_executors * 0.8, total_mem_for_executors - self.get_llap_headroom_space(services, configurations))
+            Logger.info("Calculated llap_app_heap_size : {0}, using following : hive_container_size : {1}, "
+                        "total_mem_for_executors : {2}".format(llap_xmx, hive_tez_container_size, total_mem_for_executors))
+
+            # Updating calculated configs.
+            normalized_tez_am_container_size = long(normalized_tez_am_container_size)
+            putTezInteractiveSiteProperty('tez.am.resource.memory.mb', normalized_tez_am_container_size)
+            Logger.info("'Tez for Hive2' config 'tez.am.resource.memory.mb' updated. Current: {0}".format(normalized_tez_am_container_size))
+
+            if not llap_concurrency_in_changed_configs:
+                min_llap_concurrency = 1
+                putHiveInteractiveSiteProperty('hive.server2.tez.sessions.per.default.queue', llap_concurrency)
+                putHiveInteractiveSitePropertyAttribute('hive.server2.tez.sessions.per.default.queue', "minimum", min_llap_concurrency)
+                putHiveInteractiveSitePropertyAttribute('hive.server2.tez.sessions.per.default.queue', "maximum", LLAP_MAX_CONCURRENCY)
+                Logger.info("Hive2 config 'hive.server2.tez.sessions.per.default.queue' updated. Min : {0}, Current: {1}, Max: {2}" \
+                            .format(min_llap_concurrency, llap_concurrency, LLAP_MAX_CONCURRENCY))
+
+            num_llap_nodes = long(num_llap_nodes)
+
+            putHiveInteractiveEnvProperty('num_llap_nodes', num_llap_nodes)
+            Logger.info("LLAP config 'num_llap_nodes' updated. Current: {0}".format(num_llap_nodes))
+
+            llap_container_size = long(llap_container_size)
+            putHiveInteractiveSiteProperty('hive.llap.daemon.yarn.container.mb', llap_container_size)
+            Logger.info("LLAP config 'hive.llap.daemon.yarn.container.mb' updated. Current: {0}".format(llap_container_size))
+
+            num_executors_per_node = long(num_executors_per_node)
+            putHiveInteractiveSiteProperty('hive.llap.daemon.num.executors', num_executors_per_node)
+            Logger.info("LLAP config 'hive.llap.daemon.num.executors' updated. Current: {0}".format(num_executors_per_node))
+            # 'hive.llap.io.threadpool.size' config value is to be set same as value calculated for
+            # 'hive.llap.daemon.num.executors' at all times.
+            putHiveInteractiveSiteProperty('hive.llap.io.threadpool.size', num_executors_per_node)
+            Logger.info("LLAP config 'hive.llap.io.threadpool.size' updated. Current: {0}".format(num_executors_per_node))
+
+            cache_size_per_node = long(cache_size_per_node)
+            putHiveInteractiveSiteProperty('hive.llap.io.memory.size', cache_size_per_node)
+            Logger.info("LLAP config 'hive.llap.io.memory.size' updated. Current: {0}".format(cache_size_per_node))
+            llap_io_enabled = 'false'
+            if cache_size_per_node >= 64:
+                llap_io_enabled = 'true'
+
+            putHiveInteractiveSiteProperty('hive.llap.io.enabled', llap_io_enabled)
+            Logger.info("Hive2 config 'hive.llap.io.enabled' updated to '{0}' as part of "
+                        "'hive.llap.io.memory.size' calculation.".format(llap_io_enabled))
+
+            llap_xmx = long(llap_xmx)
+            putHiveInteractiveEnvProperty('llap_heap_size', llap_xmx)
+            Logger.info("LLAP config 'llap_heap_size' updated. Current: {0}".format(llap_xmx))
+
+            slider_am_container_size = long(slider_am_container_size)
+            putHiveInteractiveEnvProperty('slider_am_container_mb', slider_am_container_size)
+            Logger.info("LLAP config 'slider_am_container_mb' updated. Current: {0}".format(slider_am_container_size))
+
+        except Exception as e:
+            # Set default values, if caught an Exception. The 'llap queue capacity' is left untouched, as it can be increased,
+            # triggerring recalculation.
+            Logger.info(e.message + " Skipping calculating LLAP configs. Setting them to minimum values.")
+            traceback.print_exc()
+
+            try:
+                yarn_min_container_size = long(self.get_yarn_min_container_size(services, configurations))
+                slider_am_container_size = long(self.calculate_slider_am_size(yarn_min_container_size))
+
+                node_manager_host_list = self.get_node_manager_hosts(services, hosts)
+                node_manager_cnt = len(node_manager_host_list)
+
+                putHiveInteractiveSiteProperty('hive.server2.tez.sessions.per.default.queue', 1)
+                putHiveInteractiveSitePropertyAttribute('hive.server2.tez.sessions.per.default.queue', "minimum", 1)
+                putHiveInteractiveSitePropertyAttribute('hive.server2.tez.sessions.per.default.queue', "maximum",32)
+
+                putHiveInteractiveEnvProperty('num_llap_nodes', 0)
+                putHiveInteractiveEnvPropertyAttribute('num_llap_nodes', "minimum", 1)
+                putHiveInteractiveEnvPropertyAttribute('num_llap_nodes', "maximum", node_manager_cnt)
+
+                putHiveInteractiveSiteProperty('hive.llap.daemon.yarn.container.mb', yarn_min_container_size)
+                putHiveInteractiveSitePropertyAttribute('hive.llap.daemon.yarn.container.mb', "minimum", yarn_min_container_size)
+
+                putHiveInteractiveSiteProperty('hive.llap.daemon.num.executors', 0)
+                putHiveInteractiveSitePropertyAttribute('hive.llap.daemon.num.executors', "minimum", 1)
+
+                putHiveInteractiveSiteProperty('hive.llap.io.threadpool.size', 0)
+
+                putHiveInteractiveSiteProperty('hive.llap.io.threadpool.size', 0)
+
+                putHiveInteractiveSiteProperty('hive.llap.io.memory.size', 0)
+
+                putHiveInteractiveEnvProperty('llap_heap_size', 0)
+
+                putHiveInteractiveEnvProperty('slider_am_container_mb', slider_am_container_size)
+
+            except Exception as e:
+                Logger.info("Problem setting minimum values for LLAP configs in Exception code.")
+                traceback.print_exc()
+
+    """
+    Returns the host(s) on which a requested service's component is hosted.
+    Parameters :
+      services : Configuration information for the cluster
+      serviceName : Passed-in service in consideration
+      componentName : Passed-in component in consideration
+    """
+    def __getHostsForComponent(self, services, serviceName, componentName):
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        componentsListList = [service["components"] for service in services["services"]]
+        componentsList = [item["StackServiceComponents"] for sublist in componentsListList for item in sublist]
+        hosts_for_component = []
+        if serviceName in servicesList:
+            hosts_for_component = [component["hostnames"] for component in componentsList if component["component_name"] == componentName][0]
+        return hosts_for_component
+
+    """
+    Checks for the presence of passed-in configuration properties in a given config, if they are changed.
+    Reads from services["changed-configurations"].
+    Parameters:
+       services: Configuration information for the cluster
+       config_type : Type of the configuration
+       config_names_set : Set of configuration properties to be checked if they are changed.
+       all_exists: If True : returns True only if all properties mentioned in 'config_names_set' we found
+                             in services["changed-configurations"].
+                             Otherwise, returns False.
+                   If False : return True, if any of the properties mentioned in config_names_set we found in
+                             services["changed-configurations"].
+                             Otherwise, returns False.
+    """
+    def are_config_props_in_changed_configs(self, services, config_type, config_names_set, all_exists):
+        changedConfigs = services["changed-configurations"]
+        changed_config_names_set = set()
+        for changedConfig in changedConfigs:
+            if changedConfig['type'] == config_type:
+                changed_config_names_set.update([changedConfig['name']])
+
+        if changed_config_names_set is None:
+            return False
+        else:
+            configs_intersection = changed_config_names_set.intersection(config_names_set)
+            if all_exists:
+                if configs_intersection == config_names_set:
+                    return True
+            else:
+                if len(configs_intersection) > 0:
+                    return True
+        return False
+
+    """
+    Returns all the Node Manager configs in cluster.
+    """
+    def get_node_manager_hosts(self, services, hosts):
+        if len(hosts["items"]) > 0:
+            node_manager_hosts = self.getHostsWithComponent("YARN", "NODEMANAGER", services, hosts)
+            assert (node_manager_hosts is not None), "Information about NODEMANAGER not found in cluster."
+            return node_manager_hosts
+
+    """
+    Returns the current LLAP queue capacity percentage value. (llap_queue_capacity)
+    """
+    def get_llap_cap_percent_slider(self, services, configurations):
+        llap_slider_cap_percentage = 0
+        if 'llap_queue_capacity' in services['configurations']['hive-interactive-env']['properties']:
+            llap_slider_cap_percentage = float(services['configurations']['hive-interactive-env']['properties']['llap_queue_capacity'])
+            Logger.error("'llap_queue_capacity' not present in services['configurations']['hive-interactive-env']['properties'].")
+        if llap_slider_cap_percentage <= 0:
+            if 'hive-interactive-env' in configurations and 'llap_queue_capacity' in configurations["hive-interactive-env"]["properties"]:
+                llap_slider_cap_percentage = float(configurations["hive-interactive-env"]["properties"]["llap_queue_capacity"])
+        assert (llap_slider_cap_percentage > 0), "'llap_queue_capacity' is set to : {0}. Should be > 0.".format(llap_slider_cap_percentage)
+        return llap_slider_cap_percentage
+
+    """
+    Returns current value of number of LLAP nodes in cluster (num_llap_nodes)
+    """
+    def get_num_llap_nodes(self, services):
+        if 'num_llap_nodes' in services['configurations']['hive-interactive-env']['properties']:
+            num_llap_nodes = float(services['configurations']['hive-interactive-env']['properties']['num_llap_nodes'])
+            assert (num_llap_nodes > 0), "Number of LLAP nodes read : {0}. Expected value : > 0".format(num_llap_nodes)
+            return num_llap_nodes
+        else:
+            raise Fail("Couldn't retrieve Hive Server interactive's 'num_llap_nodes' config.")
+
+    """
+    Gets HIVE Tez container size (hive.tez.container.size). Takes into account if it has been calculated as part of current
+    Stack Advisor invocation.
+    """
+    def get_hive_tez_container_size(self, services, configurations):
+        hive_container_size = None
+        # Check if 'hive.tez.container.size' is modified in current ST invocation.
+        if 'hive-site' in configurations and 'hive.tez.container.size' in configurations['hive-site']['properties']:
+            hive_container_size = float(configurations['hive-site']['properties']['hive.tez.container.size'])
+            Logger.info("'hive.tez.container.size' read from configurations as : {0}".format(hive_container_size))
+
+        if not hive_container_size:
+            # Check if 'hive.tez.container.size' is input in services array.
+            if 'hive.tez.container.size' in services['configurations']['hive-site']['properties']:
+                hive_container_size = float(services['configurations']['hive-site']['properties']['hive.tez.container.size'])
+                Logger.info("'hive.tez.container.size' read from services as : {0}".format(hive_container_size))
+        if not hive_container_size:
+            raise Fail("Couldn't retrieve Hive Server 'hive.tez.container.size' config.")
+
+        assert (hive_container_size > 0), "'hive.tez.container.size' current value : {0}. Expected value : > 0".format(hive_container_size)
+
+        return hive_container_size
+
+    """
+    Gets HIVE Server Interactive's 'llap_headroom_space' config. (Default value set to 6144 bytes).
+    """
+    def get_llap_headroom_space(self, services, configurations):
+        llap_headroom_space = None
+        # Check if 'llap_headroom_space' is modified in current SA invocation.
+        if 'hive-interactive-env' in configurations and 'llap_headroom_space' in configurations['hive-interactive-env']['properties']:
+            hive_container_size = float(configurations['hive-interactive-env']['properties']['llap_headroom_space'])
+            Logger.info("'llap_headroom_space' read from configurations as : {0}".format(llap_headroom_space))
+
+        if not llap_headroom_space:
+            # Check if 'llap_headroom_space' is input in services array.
+            if 'llap_headroom_space' in services['configurations']['hive-interactive-env']['properties']:
+                llap_headroom_space = float(services['configurations']['hive-interactive-env']['properties']['llap_headroom_space'])
+                Logger.info("'llap_headroom_space' read from services as : {0}".format(llap_headroom_space))
+        if not llap_headroom_space or llap_headroom_space < 1:
+            llap_headroom_space = 6144  # 6GB
+            Logger.info("Couldn't read 'llap_headroom_space' from services or configurations. Returing default value : 6144 bytes")
+
+        return llap_headroom_space
+
+    """
+    Gets YARN's minimum container size (yarn.scheduler.minimum-allocation-mb).
+    Reads from:
+      - configurations (if changed as part of current Stack Advisor invocation (output)), and services["changed-configurations"]
+        is empty, else
+      - services['configurations'] (input).
+
+    services["changed-configurations"] would be empty if Stack Advisor call is made from Blueprints (1st invocation). Subsequent
+    Stack Advisor calls will have it non-empty. We do this because in subsequent invocations, even if Stack Advsior calculates this
+    value (configurations), it is finally not recommended, making 'input' value to survive.
+    """
+    def get_yarn_min_container_size(self, services, configurations):
+        yarn_min_container_size = None
+        # Check if services["changed-configurations"] is empty and 'yarn.scheduler.minimum-allocation-mb' is modified in current ST invocation.
+        if not services["changed-configurations"] and 'yarn-site' in configurations and 'yarn.scheduler.minimum-allocation-mb' in configurations['yarn-site']['properties']:
+            yarn_min_container_size = float(configurations['yarn-site']['properties']['yarn.scheduler.minimum-allocation-mb'])
+            Logger.info("'yarn.scheduler.minimum-allocation-mb' read from configurations as : {0}".format(yarn_min_container_size))
+
+        if not yarn_min_container_size:
+            # Check if 'yarn.scheduler.minimum-allocation-mb' is input in services array.
+            if 'yarn-site' in services['configurations'] and 'yarn.scheduler.minimum-allocation-mb' in services['configurations']['yarn-site']['properties']:
+                yarn_min_container_size = float(services['configurations']['yarn-site']['properties']['yarn.scheduler.minimum-allocation-mb'])
+                Logger.info("'yarn.scheduler.minimum-allocation-mb' read from services as : {0}".format(yarn_min_container_size))
+
+        if not yarn_min_container_size:
+            raise Fail("Couldn't retrieve YARN's 'yarn.scheduler.minimum-allocation-mb' config.")
+
+        assert (yarn_min_container_size > 0), "'yarn.scheduler.minimum-allocation-mb' current value : {0}. " \
+                                              "Expected value : > 0".format(yarn_min_container_size)
+        return yarn_min_container_size
+
+    """
+    Calculates the Slider App Master size based on YARN's Minimum Container Size.
+    """
+    def calculate_slider_am_size(self, yarn_min_container_size):
+        if yarn_min_container_size > 1024:
+            return 1024
+        if yarn_min_container_size >= 256 and yarn_min_container_size <= 1024:
+            return yarn_min_container_size
+        if yarn_min_container_size < 256:
+            return 256
+
+
+    """
+    Gets YARN NodeManager memory in MB (yarn.nodemanager.resource.memory-mb).
+    Reads from:
+      - configurations (if changed as part of current Stack Advisor invocation (output)), and services["changed-configurations"]
+        is empty, else
+      - services['configurations'] (input).
+
+    services["changed-configurations"] would be empty is Stack Advisor call if made from Blueprints (1st invocation). Subsequent
+    Stack Advisor calls will have it non-empty. We do this because in subsequent invocations, even if Stack Advsior calculates this
+    value (configurations), it is finally not recommended, making 'input' value to survive.
+    """
+    def get_yarn_nm_mem_in_mb(self, services, configurations):
+        yarn_nm_mem_in_mb = None
+
+        # Check if services["changed-configurations"] is empty and 'yarn.nodemanager.resource.memory-mb' is modified in current ST invocation.
+        if not services["changed-configurations"] and \
+                        'yarn-site' in configurations and 'yarn.nodemanager.resource.memory-mb' in configurations['yarn-site']['properties']:
+            yarn_nm_mem_in_mb = float(configurations['yarn-site']['properties']['yarn.nodemanager.resource.memory-mb'])
+            Logger.info("'yarn.nodemanager.resource.memory-mb' read from configurations as : {0}".format(yarn_nm_mem_in_mb))
+
+        if not yarn_nm_mem_in_mb:
+            # Check if 'yarn.nodemanager.resource.memory-mb' is input in services array.
+            if 'yarn-site' in services['configurations'] and \
+                            'yarn.nodemanager.resource.memory-mb' in services['configurations']['yarn-site']['properties']:
+                yarn_nm_mem_in_mb = float(services['configurations']['yarn-site']['properties']['yarn.nodemanager.resource.memory-mb'])
+                Logger.info("'yarn.nodemanager.resource.memory-mb' read from services as : {0}".format(yarn_nm_mem_in_mb))
+
+        if not yarn_nm_mem_in_mb:
+            raise Fail("Couldn't retrieve YARN's 'yarn.nodemanager.resource.memory-mb' config.")
+
+        assert (yarn_nm_mem_in_mb > 0.0), "'yarn.nodemanager.resource.memory-mb' current value : {0}. " \
+                                          "Expected value : > 0".format(yarn_nm_mem_in_mb)
+
+        return yarn_nm_mem_in_mb
+
+    """
+    Determines Tez App Master container size (tez.am.resource.memory.mb) for tez_hive2/tez-site based on total cluster capacity.
+    """
+    def calculate_tez_am_container_size(self, total_cluster_capacity):
+        if total_cluster_capacity is None or not isinstance(total_cluster_capacity, long):
+            raise Fail("Passed-in 'Total Cluster Capacity' is : '{0}'".format(total_cluster_capacity))
+
+        if total_cluster_capacity <= 0:
+            raise Fail("Passed-in 'Total Cluster Capacity' ({0}) is Invalid.".format(total_cluster_capacity))
+        if total_cluster_capacity <= 4096:
+            return 256
+        elif total_cluster_capacity > 4096 and total_cluster_capacity <= 73728:
+            return 512
+        elif total_cluster_capacity > 73728:
+            return 1536
+
+    """
+    Calculate minimum queue capacity required in order to get LLAP and HIVE2 app into running state.
+    """
+    def min_queue_perc_reqd_for_llap_and_hive_app(self, services, hosts, configurations):
+        # Get queue size if sized at 20%
+        node_manager_hosts = self.get_node_manager_hosts(services, hosts)
+        yarn_rm_mem_in_mb = self.get_yarn_nm_mem_in_mb(services, configurations)
+        total_cluster_cap = len(node_manager_hosts) * yarn_rm_mem_in_mb
+        total_queue_size_at_20_perc = 20.0 / 100 * total_cluster_cap
+
+        # Calculate based on minimum size required by containers.
+        yarn_min_container_size = self.get_yarn_min_container_size(services, configurations)
+        slider_am_size = self.calculate_slider_am_size(yarn_min_container_size)
+        hive_tez_container_size = self.get_hive_tez_container_size(services, configurations)
+        tez_am_container_size = self.calculate_tez_am_container_size(long(total_cluster_cap))
+        normalized_val = self._normalizeUp(slider_am_size, yarn_min_container_size) + self._normalizeUp \
+            (hive_tez_container_size, yarn_min_container_size) + self._normalizeUp(tez_am_container_size,
+                                                                                   yarn_min_container_size)
+
+        min_required = max(total_queue_size_at_20_perc, normalized_val)
+
+        min_required_perc = min_required * 100 / total_cluster_cap
+        Logger.info(
+            "Calculated 'min_queue_perc_required_in_cluster' : {0}% and 'min_queue_cap_required_in_cluster': {1} "
+            "for LLAP and HIVE2 app using following : yarn_min_container_size : {2}, slider_am_size : {3}, hive_tez_container_size : {4}, "
+            "hive_am_container_size : {5}, total_cluster_cap : {6}, yarn_rm_mem_in_mb : {7}"
+            "".format(min_required_perc, min_required, yarn_min_container_size, slider_am_size,
+                      hive_tez_container_size,
+                      tez_am_container_size, total_cluster_cap, yarn_rm_mem_in_mb))
+        return int(math.ceil(min_required_perc))
+
+    """
+    Normalize down 'val2' with respect to 'val1'.
+    """
+    def _normalizeDown(self, val1, val2):
+        tmp = math.floor(val1 / val2)
+        if tmp < 1.00:
+            return val1
+        return tmp * val2
+
+    """
+    Normalize up 'val2' with respect to 'val1'.
+    """
+    def _normalizeUp(self, val1, val2):
+        tmp = math.ceil(val1 / val2)
+        return tmp * val2
+
+
+    """
+    Checks and (1). Creates 'llap' queue if only 'default' queue exist at leaf level and is consuming 100% capacity OR
+               (2). Updates 'llap' queue capacity and state, if current selected queue is 'llap', and only 2 queues exist
+                    at root level : 'default' and 'llap'.
+    """
+    def checkAndManageLlapQueue(self, services, configurations, hosts, llap_queue_name):
+        Logger.info("Determining creation/adjustment of 'capacity-scheduler' for 'llap' queue.")
+        putHiveInteractiveEnvProperty = self.putProperty(configurations, "hive-interactive-env", services)
+        putHiveInteractiveSiteProperty = self.putProperty(configurations, self.HIVE_INTERACTIVE_SITE, services)
+        putHiveInteractiveEnvPropertyAttribute = self.putPropertyAttribute(configurations, "hive-interactive-env")
+        putCapSchedProperty = self.putProperty(configurations, "capacity-scheduler", services)
+        leafQueueNames = None
+
+        capacity_scheduler_properties, received_as_key_value_pair = self.getCapacitySchedulerProperties(services)
+        if capacity_scheduler_properties:
+            leafQueueNames = self.getAllYarnLeafQueues(capacity_scheduler_properties)
+            # Get the llap Cluster percentage used for 'llap' Queue creation
+            if 'llap_queue_capacity' in services['configurations']['hive-interactive-env']['properties']:
+                llap_slider_cap_percentage = int(
+                    services['configurations']['hive-interactive-env']['properties']['llap_queue_capacity'])
+                min_reqd_queue_cap_perc = self.min_queue_perc_reqd_for_llap_and_hive_app(services, hosts,
+                                                                                         configurations)
+                if min_reqd_queue_cap_perc > 100:
+                    min_reqd_queue_cap_perc = 100
+                    Logger.info(
+                        "Received 'Minimum Required LLAP queue capacity' : {0}% (out of bounds), adjusted it to : 100%".format(
+                            min_reqd_queue_cap_perc))
+
+                # Adjust 'llap' queue capacity slider value to be minimum required if out of expected bounds.
+                if llap_slider_cap_percentage <= 0 or llap_slider_cap_percentage > 100:
+                    Logger.info("Adjusting HIVE 'llap_queue_capacity' from {0}% (invalid size) to {1}%".format(
+                        llap_slider_cap_percentage, min_reqd_queue_cap_perc))
+                    putHiveInteractiveEnvProperty('llap_queue_capacity', min_reqd_queue_cap_perc)
+                    llap_slider_cap_percentage = min_reqd_queue_cap_perc
+            else:
+                Logger.error(
+                    "Problem retrieving LLAP Queue Capacity. Skipping creating {0} queue".format(llap_queue_name))
+                return
+
+            cap_sched_config_keys = capacity_scheduler_properties.keys()
+
+            yarn_default_queue_capacity = -1
+            if 'yarn.scheduler.capacity.root.default.capacity' in cap_sched_config_keys:
+                yarn_default_queue_capacity = capacity_scheduler_properties.get('yarn.scheduler.capacity.root.default.capacity')
+
+            # Get 'llap' queue state
+            currLlapQueueState = ''
+            if 'yarn.scheduler.capacity.root.' + llap_queue_name + '.state' in cap_sched_config_keys:
+                currLlapQueueState = capacity_scheduler_properties.get('yarn.scheduler.capacity.root.' + llap_queue_name + '.state')
+
+            # Get 'llap' queue capacity
+            currLlapQueueCap = -1
+            if 'yarn.scheduler.capacity.root.' + llap_queue_name + '.capacity' in cap_sched_config_keys:
+                currLlapQueueCap = int(float(capacity_scheduler_properties.get('yarn.scheduler.capacity.root.' + llap_queue_name + '.capacity')))
+
+            if self.HIVE_INTERACTIVE_SITE in services['configurations'] and 'hive.llap.daemon.queue.name' in services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+                llap_daemon_selected_queue_name = services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+            else:
+                Logger.error("Couldn't retrive 'hive.llap.daemon.queue.name' property. Skipping adjusting queues.")
+                return
+            updated_cap_sched_configs_str = ''
+
+            enabled_hive_int_in_changed_configs = self.are_config_props_in_changed_configs(services, "hive-interactive-env", set(['enable_hive_interactive']), False)
+            """
+            We create OR "modify 'llap' queue 'state and/or capacity' " based on below conditions:
+             - if only 1 queue exists at root level and is 'default' queue and has 100% cap -> Create 'llap' queue,  OR
+             - if 2 queues exists at root level ('llap' and 'default') :
+                 - Queue selected is 'llap' and state is STOPPED -> Modify 'llap' queue state to RUNNING, adjust capacity, OR
+                 - Queue selected is 'llap', state is RUNNING and 'llap_queue_capacity' prop != 'llap' queue current running capacity ->
+                    Modify 'llap' queue capacity to 'llap_queue_capacity'
+            """
+            if 'default' in leafQueueNames and \
+                    ((len(leafQueueNames) == 1 and int(yarn_default_queue_capacity) == 100) or \
+                             ((len(leafQueueNames) == 2 and llap_queue_name in leafQueueNames) and \
+                                      ((currLlapQueueState == 'STOPPED' and enabled_hive_int_in_changed_configs) or (
+                                              currLlapQueueState == 'RUNNING' and currLlapQueueCap != llap_slider_cap_percentage)))):
+                adjusted_default_queue_cap = str(100 - llap_slider_cap_percentage)
+
+                hive_user = '*'  # Open to all
+                if 'hive_user' in services['configurations']['hive-env']['properties']:
+                    hive_user = services['configurations']['hive-env']['properties']['hive_user']
+
+                llap_slider_cap_percentage = str(llap_slider_cap_percentage)
+
+                # If capacity-scheduler configs are received as one concatenated string, we deposit the changed configs back as
+                # one concatenated string.
+                updated_cap_sched_configs_as_dict = False
+                if not received_as_key_value_pair:
+                    for prop, val in capacity_scheduler_properties.items():
+                        if llap_queue_name not in prop:
+                            if prop == 'yarn.scheduler.capacity.root.queues':
+                                updated_cap_sched_configs_str = updated_cap_sched_configs_str \
+                                                                + prop + "=default,llap\n"
+                            elif prop == 'yarn.scheduler.capacity.root.default.capacity':
+                                updated_cap_sched_configs_str = updated_cap_sched_configs_str \
+                                                                + prop + "=" + adjusted_default_queue_cap + "\n"
+                            elif prop == 'yarn.scheduler.capacity.root.default.maximum-capacity':
+                                updated_cap_sched_configs_str = updated_cap_sched_configs_str \
+                                                                + prop + "=" + adjusted_default_queue_cap + "\n"
+                            elif prop.startswith('yarn.') and '.llap.' not in prop:
+                                updated_cap_sched_configs_str = updated_cap_sched_configs_str + prop + "=" + val + "\n"
+
+                    # Now, append the 'llap' queue related properties
+                    updated_cap_sched_configs_str = updated_cap_sched_configs_str \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".user-limit-factor=1\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".state=RUNNING\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".ordering-policy=fifo\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".minimum-user-limit-percent=100\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".maximum-capacity=" \
+                                                    + llap_slider_cap_percentage + "\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".capacity=" \
+                                                    + llap_slider_cap_percentage + "\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".acl_submit_applications=" \
+                                                    + hive_user + "\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".acl_administer_queue=" \
+                                                    + hive_user + "\n" \
+                                                    + "yarn.scheduler.capacity.root." + llap_queue_name + ".maximum-am-resource-percent=1"
+
+                    putCapSchedProperty("capacity-scheduler", updated_cap_sched_configs_str)
+                    Logger.info("Updated 'capacity-scheduler' configs as one concatenated string.")
+                else:
+                    # If capacity-scheduler configs are received as a  dictionary (generally 1st time), we deposit the changed
+                    # values back as dictionary itself.
+                    # Update existing configs in 'capacity-scheduler'.
+                    for prop, val in capacity_scheduler_properties.items():
+                        if llap_queue_name not in prop:
+                            if prop == 'yarn.scheduler.capacity.root.queues':
+                                putCapSchedProperty(prop, 'default,llap')
+                            elif prop == 'yarn.scheduler.capacity.root.default.capacity':
+                                putCapSchedProperty(prop, adjusted_default_queue_cap)
+                            elif prop == 'yarn.scheduler.capacity.root.default.maximum-capacity':
+                                putCapSchedProperty(prop, adjusted_default_queue_cap)
+                            elif prop.startswith('yarn.') and '.llap.' not in prop:
+                                putCapSchedProperty(prop, val)
+
+                    # Add new 'llap' queue related configs.
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".user-limit-factor", "1")
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".state", "RUNNING")
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".ordering-policy", "fifo")
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".minimum-user-limit-percent", "100")
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".maximum-capacity", llap_slider_cap_percentage)
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".capacity", llap_slider_cap_percentage)
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".acl_submit_applications", hive_user)
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".acl_administer_queue", hive_user)
+                    putCapSchedProperty("yarn.scheduler.capacity.root." + llap_queue_name + ".maximum-am-resource-percent", "1")
+
+                    Logger.info("Updated 'capacity-scheduler' configs as a dictionary.")
+                    updated_cap_sched_configs_as_dict = True
+
+                if updated_cap_sched_configs_str or updated_cap_sched_configs_as_dict:
+                    if len(leafQueueNames) == 1:  # 'llap' queue didn't exist before
+                        Logger.info(
+                            "Created YARN Queue : '{0}' with capacity : {1}%. Adjusted 'default' queue capacity to : {2}%" \
+                            .format(llap_queue_name, llap_slider_cap_percentage, adjusted_default_queue_cap))
+                    else:  # Queue existed, only adjustments done.
+                        Logger.info("Adjusted YARN Queue : '{0}'. Current capacity : {1}%. State: RUNNING.".format(
+                            llap_queue_name, llap_slider_cap_percentage))
+                        Logger.info("Adjusted 'default' queue capacity to : {0}%".format(adjusted_default_queue_cap))
+
+                    # Update Hive 'hive.llap.daemon.queue.name' prop to use 'llap' queue.
+                    putHiveInteractiveSiteProperty('hive.llap.daemon.queue.name', llap_queue_name)
+                    putHiveInteractiveSiteProperty('hive.server2.tez.default.queues', llap_queue_name)
+                    putHiveInteractiveEnvPropertyAttribute('llap_queue_capacity', "minimum", min_reqd_queue_cap_perc)
+                    putHiveInteractiveEnvPropertyAttribute('llap_queue_capacity', "maximum", 100)
+
+                    # Update 'hive.llap.daemon.queue.name' prop combo entries and llap capacity slider visibility.
+                    self.setLlapDaemonQueuePropAttributesAndCapSliderVisibility(services, configurations)
+            else:
+                Logger.debug("Not creating/adjusting {0} queue. Current YARN queues : {1}".format(llap_queue_name,
+                                                                                                  list(leafQueueNames)))
+        else:
+            Logger.error(
+                "Couldn't retrieve 'capacity-scheduler' properties while doing YARN queue adjustment for Hive Server Interactive.")
+
+    """
+    Checks and sees (1). If only two leaf queues exist at root level, namely: 'default' and 'llap',
+                and (2). 'llap' is in RUNNING state.
+
+    If yes, performs the following actions:   (1). 'llap' queue state set to STOPPED,
+                                              (2). 'llap' queue capacity set to 0 %,
+                                              (3). 'default' queue capacity set to 100 %
+    """
+    def checkAndStopLlapQueue(self, services, configurations, llap_queue_name):
+        putCapSchedProperty = self.putProperty(configurations, "capacity-scheduler", services)
+        putHiveInteractiveSiteProperty = self.putProperty(configurations, self.HIVE_INTERACTIVE_SITE, services)
+        capacity_scheduler_properties, received_as_key_value_pair = self.getCapacitySchedulerProperties(services)
+        updated_default_queue_configs = ''
+        updated_llap_queue_configs = ''
+        if capacity_scheduler_properties:
+            # Get all leaf queues.
+            leafQueueNames = self.getAllYarnLeafQueues(capacity_scheduler_properties)
+
+            if len(leafQueueNames) == 2 and llap_queue_name in leafQueueNames and 'default' in leafQueueNames:
+                # Get 'llap' queue state
+                currLlapQueueState = 'STOPPED'
+                if 'yarn.scheduler.capacity.root.' + llap_queue_name + '.state' in capacity_scheduler_properties.keys():
+                    currLlapQueueState = capacity_scheduler_properties.get('yarn.scheduler.capacity.root.' + llap_queue_name + '.state')
+                else:
+                    Logger.error("{0} queue 'state' property not present in capacity scheduler. Skipping adjusting queues.".format(llap_queue_name))
+                    return
+                if currLlapQueueState == 'RUNNING':
+                    DEFAULT_MAX_CAPACITY = '100'
+                    for prop, val in capacity_scheduler_properties.items():
+                        # Update 'default' related configs in 'updated_default_queue_configs'
+                        if llap_queue_name not in prop:
+                            if prop == 'yarn.scheduler.capacity.root.default.capacity':
+                                # Set 'default' capacity back to maximum val
+                                updated_default_queue_configs = updated_default_queue_configs \
+                                                                + prop + "=" + DEFAULT_MAX_CAPACITY + "\n"
+                            elif prop == 'yarn.scheduler.capacity.root.default.maximum-capacity':
+                                # Set 'default' max. capacity back to maximum val
+                                updated_default_queue_configs = updated_default_queue_configs \
+                                                                + prop + "=" + DEFAULT_MAX_CAPACITY + "\n"
+                            elif prop.startswith('yarn.'):
+                                updated_default_queue_configs = updated_default_queue_configs + prop + "=" + val + "\n"
+                        else:  # Update 'llap' related configs in 'updated_llap_queue_configs'
+                            if prop == 'yarn.scheduler.capacity.root.' + llap_queue_name + '.state':
+                                updated_llap_queue_configs = updated_llap_queue_configs \
+                                                             + prop + "=STOPPED\n"
+                            elif prop == 'yarn.scheduler.capacity.root.' + llap_queue_name + '.capacity':
+                                updated_llap_queue_configs = updated_llap_queue_configs \
+                                                             + prop + "=0\n"
+                            elif prop == 'yarn.scheduler.capacity.root.' + llap_queue_name + '.maximum-capacity':
+                                updated_llap_queue_configs = updated_llap_queue_configs \
+                                                             + prop + "=0\n"
+                            elif prop.startswith('yarn.'):
+                                updated_llap_queue_configs = updated_llap_queue_configs + prop + "=" + val + "\n"
+                else:
+                    Logger.debug("{0} queue state is : {1}. Skipping adjusting queues.".format(llap_queue_name,
+                                                                                               currLlapQueueState))
+                    return
+
+                if updated_default_queue_configs and updated_llap_queue_configs:
+                    putCapSchedProperty("capacity-scheduler", updated_default_queue_configs + updated_llap_queue_configs)
+                    Logger.info(
+                        "Changed YARN '{0}' queue state to 'STOPPED', and capacity to 0%. Adjusted 'default' queue capacity to : {1}%" \
+                        .format(llap_queue_name, DEFAULT_MAX_CAPACITY))
+
+                    # Update Hive 'hive.llap.daemon.queue.name' prop to use 'default' queue.
+                    putHiveInteractiveSiteProperty('hive.llap.daemon.queue.name', self.YARN_ROOT_DEFAULT_QUEUE_NAME)
+                    putHiveInteractiveSiteProperty('hive.server2.tez.default.queues', self.YARN_ROOT_DEFAULT_QUEUE_NAME)
+            else:
+                Logger.debug("Not removing '{0}' queue as number of Queues not equal to 2. Current YARN queues : {1}".format(llap_queue_name, list(leafQueueNames)))
+        else:
+            Logger.error(
+                "Couldn't retrieve 'capacity-scheduler' properties while doing YARN queue adjustment for Hive Server Interactive.")
+
+    """
+    Checks and sets the 'Hive Server Interactive' 'hive.llap.daemon.queue.name' config Property Attributes.  Takes into
+    account that 'capacity-scheduler' may have changed (got updated) in current Stack Advisor invocation.
+
+    Also, updates the 'llap_queue_capacity' slider visibility.
+    """
+
+    def setLlapDaemonQueuePropAttributesAndCapSliderVisibility(self, services, configurations):
+        Logger.info("Determining 'hive.llap.daemon.queue.name' config Property Attributes.")
+        putHiveInteractiveSitePropertyAttribute = self.putPropertyAttribute(configurations,
+                                                                            self.HIVE_INTERACTIVE_SITE)
+        putHiveInteractiveEnvPropertyAttribute = self.putPropertyAttribute(configurations, "hive-interactive-env")
+
+        capacity_scheduler_properties = dict()
+
+        # Read 'capacity-scheduler' from configurations if we modified and added recommendation to it, as part of current
+        # StackAdvisor invocation.
+        if "capacity-scheduler" in configurations:
+            cap_sched_props_as_dict = configurations["capacity-scheduler"]["properties"]
+            if 'capacity-scheduler' in cap_sched_props_as_dict:
+                cap_sched_props_as_str = configurations['capacity-scheduler']['properties']['capacity-scheduler']
+                if cap_sched_props_as_str:
+                    cap_sched_props_as_str = str(cap_sched_props_as_str).split('\n')
+                    if len(cap_sched_props_as_str) > 0 and cap_sched_props_as_str[0] != 'null':
+                        # Got 'capacity-scheduler' configs as one "\n" separated string
+                        for property in cap_sched_props_as_str:
+                            key, sep, value = property.partition("=")
+                            capacity_scheduler_properties[key] = value
+                        Logger.info(
+                            "'capacity-scheduler' configs is set as a single '\\n' separated string in current invocation. "
+                            "count(configurations['capacity-scheduler']['properties']['capacity-scheduler']) = "
+                            "{0}".format(len(capacity_scheduler_properties)))
+                    else:
+                        Logger.info(
+                            "Read configurations['capacity-scheduler']['properties']['capacity-scheduler'] is : {0}".format(
+                                cap_sched_props_as_str))
+                else:
+                    Logger.info(
+                        "configurations['capacity-scheduler']['properties']['capacity-scheduler'] : {0}.".format(
+                            cap_sched_props_as_str))
+
+            # if 'capacity_scheduler_properties' is empty, implies we may have 'capacity-scheduler' configs as dictionary
+            # in configurations, if 'capacity-scheduler' changed in current invocation.
+            if not capacity_scheduler_properties:
+                if isinstance(cap_sched_props_as_dict, dict) and len(cap_sched_props_as_dict) > 1:
+                    capacity_scheduler_properties = cap_sched_props_as_dict
+                    Logger.info("'capacity-scheduler' changed in current Stack Advisor invocation. Retrieved the configs as dictionary from configurations.")
+                else:
+                    Logger.info("Read configurations['capacity-scheduler']['properties'] is : {0}".format(cap_sched_props_as_dict))
+        else:
+            Logger.info("'capacity-scheduler' not modified in the current Stack Advisor invocation.")
+
+        # if 'capacity_scheduler_properties' is still empty, implies 'capacity_scheduler' wasn't change in current
+        # SA invocation. Thus, read it from input : 'services'.
+        if not capacity_scheduler_properties:
+            capacity_scheduler_properties, received_as_key_value_pair = self.getCapacitySchedulerProperties(
+                services)
+            Logger.info(
+                "'capacity-scheduler' not changed in current Stack Advisor invocation. Retrieved the configs from services.")
+
+        # Get set of current YARN leaf queues.
+        leafQueueNames = self.getAllYarnLeafQueues(capacity_scheduler_properties)
+        if leafQueueNames:
+            leafQueues = [{"label": str(queueName), "value": queueName} for queueName in leafQueueNames]
+            leafQueues = sorted(leafQueues, key=lambda q: q['value'])
+            putHiveInteractiveSitePropertyAttribute("hive.llap.daemon.queue.name", "entries", leafQueues)
+            Logger.info("'hive.llap.daemon.queue.name' config Property Attributes set to : {0}".format(leafQueues))
+
+            # Update 'llap_queue_capacity' slider visibility to 'true' if current selected queue in 'hive.llap.daemon.queue.name'
+            # is 'llap', else 'false'.
+            llap_daemon_selected_queue_name = None
+            llap_queue_selected_in_current_call = None
+            if self.HIVE_INTERACTIVE_SITE in services['configurations'] and \
+                            'hive.llap.daemon.queue.name' in services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']:
+                llap_daemon_selected_queue_name = services['configurations'][self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+
+            if self.HIVE_INTERACTIVE_SITE in configurations and \
+                            'hive.llap.daemon.queue.name' in configurations[self.HIVE_INTERACTIVE_SITE]['properties']:
+                llap_queue_selected_in_current_call = configurations[self.HIVE_INTERACTIVE_SITE]['properties']['hive.llap.daemon.queue.name']
+
+            # Check to see if only 2 queues exist at root level : 'default' and 'llap' and current selected queue in 'hive.llap.daemon.queue.name'
+            # is 'llap'.
+            if len(leafQueueNames) == 2 and \
+                    ((llap_daemon_selected_queue_name != None and llap_daemon_selected_queue_name == 'llap') or \
+                             (llap_queue_selected_in_current_call != None and llap_queue_selected_in_current_call == 'llap')):
+                putHiveInteractiveEnvPropertyAttribute("llap_queue_capacity", "visible", "true")
+                Logger.info("Setting LLAP queue capacity slider visibility to 'True'.")
+            else:
+                putHiveInteractiveEnvPropertyAttribute("llap_queue_capacity", "visible", "false")
+                Logger.info("Setting LLAP queue capacity slider visibility to 'False'.")
+        else:
+            Logger.error("Problem retrieving YARN queues. Skipping updating HIVE Server Interactve "
+                         "'hive.server2.tez.default.queues' property attributes.")
+
+    """
+    Retrieves the passed in queue's 'capacity' related key from Capacity Scheduler.
+    """
+
+    def __getQueueCapacityKeyFromCapacityScheduler(self, capacity_scheduler_properties,
+                                                   llap_daemon_selected_queue_name):
+        # Identify the key which contains the capacity for 'llap_daemon_selected_queue_name'.
+        cap_sched_keys = capacity_scheduler_properties.keys()
+        llap_selected_queue_cap_key = None
+        current_selected_queue_for_llap_cap = None
+        for key in cap_sched_keys:
+            # Expected capacity prop key is of form : 'yarn.scheduler.capacity.<one or more queues in path separated by '.'>.[llap_daemon_selected_queue_name].capacity'
+            if key.endswith(llap_daemon_selected_queue_name + ".capacity"):
+                llap_selected_queue_cap_key = key
+                break;
+        return llap_selected_queue_cap_key
+
+    """
+    Retrieves the passed in queue's 'state' from Capacity Scheduler.
+    """
+
+    def __getQueueStateFromCapacityScheduler(self, capacity_scheduler_properties, llap_daemon_selected_queue_name):
+        # Identify the key which contains the state for 'llap_daemon_selected_queue_name'.
+        cap_sched_keys = capacity_scheduler_properties.keys()
+        llap_selected_queue_state_key = None
+        llap_selected_queue_state = None
+        for key in cap_sched_keys:
+            if key.endswith(llap_daemon_selected_queue_name + ".state"):
+                llap_selected_queue_state_key = key
+                break;
+        llap_selected_queue_state = capacity_scheduler_properties.get(llap_selected_queue_state_key)
+        return llap_selected_queue_state
+
+    """
+    Calculates the total available capacity for the passed-in YARN queue of any level based on the percentages.
+    """
+
+    def __getSelectedQueueTotalCap(self, capacity_scheduler_properties, llap_daemon_selected_queue_name,
+                                   total_cluster_capacity):
+        Logger.info("Entered __getSelectedQueueTotalCap fn().")
+        available_capacity = total_cluster_capacity
+        queue_cap_key = self.__getQueueCapacityKeyFromCapacityScheduler(capacity_scheduler_properties,
+                                                                        llap_daemon_selected_queue_name)
+        if queue_cap_key:
+            queue_cap_key = queue_cap_key.strip()
+            if len(queue_cap_key) >= 34:  # len('yarn.scheduler.capacity.<single letter queue name>.capacity') = 34
+                # Expected capacity prop key is of form : 'yarn.scheduler.capacity.<one or more queues (path)>.capacity'
+                queue_path = queue_cap_key[24:]  # Strip from beginning 'yarn.scheduler.capacity.'
+                queue_path = queue_path[0:-9]  # Strip from end '.capacity'
+                queues_list = queue_path.split('.')
+                Logger.info("Queue list : {0}".format(queues_list))
+                if queues_list:
+                    for queue in queues_list:
+                        queue_cap_key = self.__getQueueCapacityKeyFromCapacityScheduler(
+                            capacity_scheduler_properties, queue)
+                        queue_cap_perc = float(capacity_scheduler_properties.get(queue_cap_key))
+                        available_capacity = queue_cap_perc / 100 * available_capacity
+                        Logger.info(
+                            "Total capacity available for queue {0} is : {1}".format(queue, available_capacity))
+                else:
+                    raise Fail(
+                        "Retrieved 'queue list' from capacity-scheduler is empty while doing '{0}' queue capacity caluclation."
+                        .format(llap_daemon_selected_queue_name))
+            else:
+                raise Fail("Expected length for queue_cap_key(val:{0}) should be greater than atleast 34.".format(
+                    queue_cap_key))
+        else:
+            raise Fail(
+                "Couldn't retrieve {0}' queue capacity KEY from capacity-scheduler while doing capacity caluclation.".format(
+                    llap_daemon_selected_queue_name))
+        # returns the capacity calculated for passed-in queue in 'llap_daemon_selected_queue_name'.
+        return available_capacity
+
+    def validateKAFKAConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        kafka_broker = properties
+        validationItems = []
+
+        #Adding Ranger Plugin logic here
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-kafka-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-kafka-plugin-enabled']
+        prop_name = 'authorizer.class.name'
+        prop_val = "org.apache.ranger.authorization.kafka.authorizer.RangerKafkaAuthorizer"
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if ("RANGER" in servicesList) and (ranger_plugin_enabled.lower() == 'Yes'.lower()):
+            if kafka_broker[prop_name] != prop_val:
+                validationItems.append({"config-name": prop_name,
+                                        "item": self.getWarnItem(
+                                            "If Ranger Kafka Plugin is enabled." \
+                                            "{0} needs to be set to {1}".format(prop_name,prop_val))})
+
+        return self.toConfigurationValidationProblems(validationItems, "kafka-broker")
+
+
+
+
 # Validation helper methods
 def getSiteProperties(configurations, siteName):
     siteConfig = configurations.get(siteName)
@@ -3159,6 +4696,7 @@ def getMemorySizeRequired(components, configurations):
 
 def round_to_n(mem_size, n=128):
     return int(round(mem_size / float(n))) * int(n)
+
 def is_valid_host_port_authority(target):
   has_scheme = "://" in target
   if not has_scheme:
@@ -3170,3 +4708,4 @@ def is_valid_host_port_authority(target):
   except ValueError:
     pass
   return False
+

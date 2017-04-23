@@ -23,6 +23,116 @@
       <version>1.2.1</version>
       <extends>common-services/HIVE/0.12.0.2.0</extends>
 
+      <components>
+        <component>
+          <name>HIVE_SERVER_INTERACTIVE</name>
+          <displayName>HiveServer2 Interactive</displayName>
+          <category>MASTER</category>
+          <cardinality>0-1</cardinality>
+          <versionAdvertised>true</versionAdvertised>
+          <clientsToUpdateConfigs></clientsToUpdateConfigs>
+
+          <dependencies>
+            <dependency>
+              <name>ZOOKEEPER/ZOOKEEPER_SERVER</name>
+              <scope>cluster</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+                <co-locate>HIVE/HIVE_SERVER_INTERACTIVE</co-locate>
+              </auto-deploy>
+            </dependency>
+            <dependency>
+              <name>YARN/YARN_CLIENT</name>
+              <scope>host</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+                <co-locate>HIVE/HIVE_SERVER_INTERACTIVE</co-locate>
+              </auto-deploy>
+            </dependency>
+            <dependency>
+              <name>HDFS/HDFS_CLIENT</name>
+              <scope>host</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+                <co-locate>HIVE/HIVE_SERVER_INTERACTIVE</co-locate>
+              </auto-deploy>
+            </dependency>
+            <dependency>
+              <name>MAPREDUCE2/MAPREDUCE2_CLIENT</name>
+              <scope>host</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+                <co-locate>HIVE/HIVE_SERVER_INTERACTIVE</co-locate>
+              </auto-deploy>
+            </dependency>
+            <dependency>
+              <name>TEZ/TEZ_CLIENT</name>
+              <scope>host</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+                <co-locate>HIVE/HIVE_SERVER_INTERACTIVE</co-locate>
+              </auto-deploy>
+            </dependency>
+            <dependency>
+              <name>SLIDER/SLIDER</name>
+              <scope>host</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+                <co-locate>HIVE/HIVE_SERVER_INTERACTIVE</co-locate>
+              </auto-deploy>
+            </dependency>
+          </dependencies>
+          <commandScript>
+            <script>scripts/hive_server_interactive.py</script>
+            <scriptType>PYTHON</scriptType>
+          </commandScript>
+          <customCommands>
+            <customCommand>
+              <name>RESTART_LLAP</name>
+              <commandScript>
+                <script>scripts/hive_server_interactive.py</script>
+                <scriptType>PYTHON</scriptType>
+                <timeout>600</timeout>
+              </commandScript>
+            </customCommand>
+          </customCommands>
+          <configuration-dependencies>
+            <config-type>beeline-log4j2</config-type>
+            <config-type>hive-exec-log4j2</config-type>
+            <config-type>hive-log4j2</config-type>
+            <config-type>hive-site</config-type>
+            <config-type>hive-interactive-site</config-type>
+            <config-type>tez-interactive-site</config-type>
+            <config-type>hiveserver2-interactive-site</config-type>
+            <config-type>hive-interactive-env</config-type>
+            <config-type>llap-cli-log4j2</config-type>
+            <config-type>llap-daemon-log4j</config-type>
+          </configuration-dependencies>
+        </component>
+      </components>
+
+      <themes>
+        <theme>
+          <fileName>theme.json</fileName>
+          <default>true</default>
+        </theme>
+      </themes>
+
+      <quickLinksConfigurations>
+        <quickLinksConfiguration>
+          <fileName>quicklinks.json</fileName>
+          <default>true</default>
+        </quickLinksConfiguration>
+      </quickLinksConfigurations>
+
+      <requiredServices>
+        <service>ZOOKEEPER</service>
+        <service>HDFS</service>
+        <service>YARN</service>
+        <service>TEZ</service>
+        <service>SLIDER</service>
+      </requiredServices>
+
       <osSpecifics>
         <osSpecific>
           <osFamily>redhat6,redhat7</osFamily>
