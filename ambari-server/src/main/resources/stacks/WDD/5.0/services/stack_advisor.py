@@ -12,6 +12,7 @@ from math import ceil, floor
 from resource_management.core.logger import Logger
 from resource_management.libraries.functions.mounted_dirs_helper import get_mounts_with_multiple_data_dirs
 from resource_management.libraries.functions.get_bare_principal import get_bare_principal
+from urlparse import urlparse
 
 from stack_advisor import DefaultStackAdvisor
 
@@ -329,19 +330,20 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
     def recommendHDFSConfigurations(self, configurations, clusterData, services, hosts):
         putHadoopEnvProperty = self.putProperty(configurations, "hadoop-env", services)
-        putHDFSSiteProperty = self.putProperty(configurations, "hdfs-site", services)
-        putHDFSSitePropertyAttributes = self.putPropertyAttribute(configurations, "hdfs-site")
+        putHdfsSiteProperty = self.putProperty(configurations, "hdfs-site", services)
+        putHdfsSitePropertyAttributes = self.putPropertyAttribute(configurations, "hdfs-site")
         putCoreSitePropertyAttributes = self.putPropertyAttribute(configurations, "core-site")
 
+        # HDP 2.0.6
         # calculate recommended memory
         putHadoopEnvProperty('namenode_heapsize', max(int(clusterData['totalAvailableRam'] / 2), 1024))
         putHadoopEnvProperty('namenode_opt_newsize', max(int(clusterData['totalAvailableRam'] / 8), 128))
         putHadoopEnvProperty('namenode_opt_maxnewsize', max(int(clusterData['totalAvailableRam'] / 8), 256))
 
         # recommended hdfs data location
-        putHDFSSiteProperty("dfs.namenode.name.dir", "/var/hdfs/namenode")
-        putHDFSSiteProperty("dfs.namenode.checkpoint.dir", "/var/hdfs/namesecondary")
-        putHDFSSiteProperty("dfs.datanode.data.dir", "/var/hdfs/data")
+        putHdfsSiteProperty("dfs.namenode.name.dir", "/var/hdfs/namenode")
+        putHdfsSiteProperty("dfs.namenode.checkpoint.dir", "/var/hdfs/namesecondary")
+        putHdfsSiteProperty("dfs.datanode.data.dir", "/var/hdfs/data")
 
         # Check if NN HA is enabled and recommend removing dfs.namenode.rpc-address
         hdfsSiteProperties = getServicesSiteProperties(services, "hdfs-site")
@@ -353,12 +355,12 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         if nameServices and "dfs.ha.namenodes.%s" % nameServices in hdfsSiteProperties:
             namenodes = hdfsSiteProperties["dfs.ha.namenodes.%s" % nameServices]
             if len(namenodes.split(',')) > 1:
-                putHDFSSitePropertyAttributes("dfs.namenode.rpc-address", "delete", "true")
+                putHdfsSitePropertyAttributes("dfs.namenode.rpc-address", "delete", "true")
 
         #Initialize default 'dfs.datanode.data.dir' if needed
         if (not hdfsSiteProperties) or ('dfs.datanode.data.dir' not in hdfsSiteProperties):
             dataDirs = '/hadoop/hdfs/data'
-            putHDFSSiteProperty('dfs.datanode.data.dir', dataDirs)
+            putHdfsSiteProperty('dfs.datanode.data.dir', dataDirs)
         else:
             dataDirs = hdfsSiteProperties['dfs.datanode.data.dir'].split(",")
 
@@ -386,16 +388,121 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
         if reservedSizeRecommendation:
             reservedSizeRecommendation = max(reservedSizeRecommendation * 1024 / 8, 1073741824) # At least 1Gb is reserved
-            putHDFSSiteProperty('dfs.datanode.du.reserved', reservedSizeRecommendation) #Bytes
+            putHdfsSiteProperty('dfs.datanode.du.reserved', reservedSizeRecommendation) #Bytes
 
         # recommendations for "hadoop.proxyuser.*.hosts", "hadoop.proxyuser.*.groups" properties in core-site
         self.recommendHadoopProxyUsers(configurations, services, hosts)
+        # end of HDP 2.0.6
+
+        # HDP 2.2 stack
+        putHdfsSiteProperty("dfs.datanode.max.transfer.threads", 16384 if clusterData["hBaseInstalled"] else 4096)
+        dataDirsCount = 1
+        # Use users 'dfs.datanode.data.dir' first
+        if "hdfs-site" in services["configurations"] and "dfs.datanode.data.dir" in services["configurations"]["hdfs-site"]["properties"]:
+            dataDirsCount = len(str(services["configurations"]["hdfs-site"]["properties"]["dfs.datanode.data.dir"]).split(","))
+        elif "dfs.datanode.data.dir" in configurations["hdfs-site"]["properties"]:
+            dataDirsCount = len(str(configurations["hdfs-site"]["properties"]["dfs.datanode.data.dir"]).split(","))
+        if dataDirsCount <= 2:
+            failedVolumesTolerated = 0
+        elif dataDirsCount <= 4:
+            failedVolumesTolerated = 1
+        else:
+            failedVolumesTolerated = 2
+        putHdfsSiteProperty("dfs.datanode.failed.volumes.tolerated", failedVolumesTolerated)
+
+        namenodeHosts = self.getHostsWithComponent("HDFS", "NAMENODE", services, hosts)
+
+        # 25 * # of cores on NameNode
+        nameNodeCores = 4
+        if namenodeHosts is not None and len(namenodeHosts):
+            nameNodeCores = int(namenodeHosts[0]['Hosts']['cpu_count'])
+        putHdfsSiteProperty("dfs.namenode.handler.count", 25 * nameNodeCores)
+        if 25 * nameNodeCores > 200:
+            putHdfsSitePropertyAttributes("dfs.namenode.handler.count", "maximum", 25 * nameNodeCores)
 
         servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
         if ('ranger-hdfs-plugin-properties' in services['configurations']) and ('ranger-hdfs-plugin-enabled' in services['configurations']['ranger-hdfs-plugin-properties']['properties']):
             rangerPluginEnabled = services['configurations']['ranger-hdfs-plugin-properties']['properties']['ranger-hdfs-plugin-enabled']
             if ("RANGER" in servicesList) and (rangerPluginEnabled.lower() == 'Yes'.lower()):
-                putHDFSSiteProperty("dfs.permissions.enabled",'true')
+                putHdfsSiteProperty("dfs.permissions.enabled",'true')
+
+        putHdfsSiteProperty("dfs.namenode.safemode.threshold-pct", "0.999" if len(namenodeHosts) > 1 else "1.000")
+
+        putHdfsEnvProperty = self.putProperty(configurations, "hadoop-env", services)
+        putHdfsEnvPropertyAttribute = self.putPropertyAttribute(configurations, "hadoop-env")
+
+        putHdfsEnvProperty('namenode_heapsize', max(int(clusterData['totalAvailableRam'] / 2), 1024))
+
+        nn_heapsize_limit = None
+        if (namenodeHosts is not None and len(namenodeHosts) > 0):
+            if len(namenodeHosts) > 1:
+                nn_max_heapsize = min(int(namenodeHosts[0]["Hosts"]["total_mem"]), int(namenodeHosts[1]["Hosts"]["total_mem"])) / 1024
+                masters_at_host = max(self.getHostComponentsByCategories(namenodeHosts[0]["Hosts"]["host_name"], ["MASTER"], services, hosts),
+                                      self.getHostComponentsByCategories(namenodeHosts[1]["Hosts"]["host_name"], ["MASTER"], services,hosts))
+            else:
+                nn_max_heapsize = int(namenodeHosts[0]["Hosts"]["total_mem"] / 1024)  # total_mem in kb
+                masters_at_host = self.getHostComponentsByCategories(namenodeHosts[0]["Hosts"]["host_name"], ["MASTER"], services, hosts)
+
+            putHdfsEnvPropertyAttribute('namenode_heapsize', 'maximum', max(nn_max_heapsize, 1024))
+
+            nn_heapsize_limit = nn_max_heapsize
+            nn_heapsize_limit -= clusterData["reservedRam"]
+            if len(masters_at_host) > 1:
+                nn_heapsize_limit = int(nn_heapsize_limit / 2)
+
+            putHdfsEnvProperty('namenode_heapsize', max(nn_heapsize_limit, 1024))
+
+        datanodeHosts = self.getHostsWithComponent("HDFS", "DATANODE", services, hosts)
+        if datanodeHosts is not None and len(datanodeHosts) > 0:
+            min_datanode_ram_kb = 1073741824  # 1 TB
+            for datanode in datanodeHosts:
+                ram_kb = datanode['Hosts']['total_mem']
+                min_datanode_ram_kb = min(min_datanode_ram_kb, ram_kb)
+
+            datanodeFilesM = len(datanodeHosts) * dataDirsCount / 10  # in millions, # of files = # of disks * 100'000
+            nn_memory_configs = [
+                {'nn_heap': 1024, 'nn_opt': 128},
+                {'nn_heap': 3072, 'nn_opt': 512},
+                {'nn_heap': 5376, 'nn_opt': 768},
+                {'nn_heap': 9984, 'nn_opt': 1280},
+                {'nn_heap': 14848, 'nn_opt': 2048},
+                {'nn_heap': 19456, 'nn_opt': 2560},
+                {'nn_heap': 24320, 'nn_opt': 3072},
+                {'nn_heap': 33536, 'nn_opt': 4352},
+                {'nn_heap': 47872, 'nn_opt': 6144},
+                {'nn_heap': 59648, 'nn_opt': 7680},
+                {'nn_heap': 71424, 'nn_opt': 8960},
+                {'nn_heap': 94976, 'nn_opt': 8960}
+            ]
+            index = {
+                datanodeFilesM < 1: 0,
+                1 <= datanodeFilesM < 5: 1,
+                5 <= datanodeFilesM < 10: 2,
+                10 <= datanodeFilesM < 20: 3,
+                20 <= datanodeFilesM < 30: 4,
+                30 <= datanodeFilesM < 40: 5,
+                40 <= datanodeFilesM < 50: 6,
+                50 <= datanodeFilesM < 70: 7,
+                70 <= datanodeFilesM < 100: 8,
+                100 <= datanodeFilesM < 125: 9,
+                125 <= datanodeFilesM < 150: 10,
+                150 <= datanodeFilesM: 11
+            }[1]
+
+            nn_memory_config = nn_memory_configs[index]
+
+            # override with new values if applicable
+            if nn_heapsize_limit is not None and nn_memory_config['nn_heap'] <= nn_heapsize_limit:
+                putHdfsEnvProperty('namenode_heapsize', nn_memory_config['nn_heap'])
+
+            putHdfsEnvPropertyAttribute('dtnode_heapsize', 'maximum', int(min_datanode_ram_kb / 1024))
+
+        nn_heapsize = int(configurations["hadoop-env"]["properties"]["namenode_heapsize"])
+        putHdfsEnvProperty('namenode_opt_newsize', max(int(nn_heapsize / 8), 128))
+        putHdfsEnvProperty('namenode_opt_maxnewsize', max(int(nn_heapsize / 8), 128))
+
+        putHdfsSitePropertyAttribute = self.putPropertyAttribute(configurations, "hdfs-site")
+        putHdfsSitePropertyAttribute('dfs.datanode.failed.volumes.tolerated', 'maximum', dataDirsCount)
 
         keyserverHostsString = None
         keyserverPortString = None
@@ -412,17 +519,13 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             for rangeKMSServerHost in rangerKMSServerHosts:
                 rangerKMSServerHostsArray.append(rangeKMSServerHost["Hosts"]["host_name"])
             keyserverHostsString = ";".join(rangerKMSServerHostsArray)
-            if "kms-env" in services["configurations"] and "kms_port" in services["configurations"]["kms-env"][
-                "properties"]:
+            if "kms-env" in services["configurations"] and "kms_port" in services["configurations"]["kms-env"]["properties"]:
                 keyserverPortString = services["configurations"]["kms-env"]["properties"]["kms_port"]
 
         if keyserverHostsString is not None and len(keyserverHostsString.strip()) > 0:
             urlScheme = "http"
-            if "ranger-kms-site" in services["configurations"] and \
-                            "ranger.service.https.attrib.ssl.enabled" in services["configurations"]["ranger-kms-site"][
-                        "properties"] and \
-                            services["configurations"]["ranger-kms-site"]["properties"][
-                                "ranger.service.https.attrib.ssl.enabled"].lower() == "true":
+            if "ranger-kms-site" in services["configurations"] and "ranger.service.https.attrib.ssl.enabled" in services["configurations"]["ranger-kms-site"]["properties"] and \
+                            services["configurations"]["ranger-kms-site"]["properties"]["ranger.service.https.attrib.ssl.enabled"].lower() == "true":
                 urlScheme = "https"
 
             if keyserverPortString is None or len(keyserverPortString.strip()) < 1:
@@ -432,38 +535,33 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             putCoreSiteProperty = self.putProperty(configurations, "core-site", services)
             kmsPath = "kms://" + urlScheme + "@" + keyserverHostsString.strip() + keyserverPortString + "/kms"
             putCoreSiteProperty("hadoop.security.key.provider.path", kmsPath)
-            putHDFSSiteProperty("dfs.encryption.key.provider.uri", kmsPath)
+            putHdfsSiteProperty("dfs.encryption.key.provider.uri", kmsPath)
 
         if "ranger-env" in services["configurations"] and "ranger-hdfs-plugin-properties" in services["configurations"] and \
             "ranger-hdfs-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
             putHdfsRangerPluginProperty = self.putProperty(configurations, "ranger-hdfs-plugin-properties", services)
-            rangerEnvHdfsPluginProperty = services["configurations"]["ranger-env"]["properties"][
-                "ranger-hdfs-plugin-enabled"]
+            rangerEnvHdfsPluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-hdfs-plugin-enabled"]
             putHdfsRangerPluginProperty("ranger-hdfs-plugin-enabled", rangerEnvHdfsPluginProperty)
 
-        if ('ranger-hdfs-plugin-properties' in services['configurations']) and (
-            'ranger-hdfs-plugin-enabled' in services['configurations']['ranger-hdfs-plugin-properties']['properties']):
+        if ('ranger-hdfs-plugin-properties' in services['configurations']) and ('ranger-hdfs-plugin-enabled' in services['configurations']['ranger-hdfs-plugin-properties']['properties']):
             rangerPluginEnabled = ''
-            if 'ranger-hdfs-plugin-properties' in configurations and 'ranger-hdfs-plugin-enabled' in \
-                    configurations['ranger-hdfs-plugin-properties']['properties']:
-                rangerPluginEnabled = configurations['ranger-hdfs-plugin-properties']['properties'][
-                    'ranger-hdfs-plugin-enabled']
-            elif 'ranger-hdfs-plugin-properties' in services['configurations'] and 'ranger-hdfs-plugin-enabled' in \
-                    services['configurations']['ranger-hdfs-plugin-properties']['properties']:
-                rangerPluginEnabled = services['configurations']['ranger-hdfs-plugin-properties']['properties'][
-                    'ranger-hdfs-plugin-enabled']
+            if 'ranger-hdfs-plugin-properties' in configurations and 'ranger-hdfs-plugin-enabled' in configurations['ranger-hdfs-plugin-properties']['properties']:
+                rangerPluginEnabled = configurations['ranger-hdfs-plugin-properties']['properties']['ranger-hdfs-plugin-enabled']
+            elif 'ranger-hdfs-plugin-properties' in services['configurations'] and 'ranger-hdfs-plugin-enabled' in services['configurations']['ranger-hdfs-plugin-properties']['properties']:
+                rangerPluginEnabled = services['configurations']['ranger-hdfs-plugin-properties']['properties']['ranger-hdfs-plugin-enabled']
 
             if rangerPluginEnabled and (rangerPluginEnabled.lower() == 'Yes'.lower()):
-                putHDFSSiteProperty("dfs.namenode.inode.attributes.provider.class",
-                                    'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer')
+                putHdfsSiteProperty("dfs.namenode.inode.attributes.provider.class", 'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer')
             else:
-                putHDFSSitePropertyAttributes('dfs.namenode.inode.attributes.provider.class', 'delete', 'true')
+                putHdfsSitePropertyAttributes('dfs.namenode.inode.attributes.provider.class', 'delete', 'true')
         else:
-            putHDFSSitePropertyAttributes('dfs.namenode.inode.attributes.provider.class', 'delete', 'true')
+            putHdfsSitePropertyAttributes('dfs.namenode.inode.attributes.provider.class', 'delete', 'true')
 
         if not "RANGER_KMS" in servicesList:
             putCoreSitePropertyAttributes('hadoop.security.key.provider.path', 'delete', 'true')
-            putHDFSSitePropertyAttributes('dfs.encryption.key.provider.uri', 'delete', 'true')
+            putHdfsSitePropertyAttributes('dfs.encryption.key.provider.uri', 'delete', 'true')
+        # end of HDP 2.2 stack
+
 
 
     def recommendHbaseConfigurations(self, configurations, clusterData, services, hosts):
@@ -580,22 +678,18 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             # HTTPS protocol is used
             protocol = 'https'
             # Starting Ranger-0.5.0.2.3 port stored in ranger-admin-site ranger.service.https.port
-            if 'ranger-admin-site' in services['configurations'] and \
-                            'ranger.service.https.port' in services['configurations']['ranger-admin-site']['properties']:
+            if 'ranger-admin-site' in services['configurations'] and 'ranger.service.https.port' in services['configurations']['ranger-admin-site']['properties']:
                 port = services['configurations']['ranger-admin-site']['properties']['ranger.service.https.port']
             # In Ranger-0.4.0 port stored in ranger-site https.service.port
-            elif 'ranger-site' in services['configurations'] and \
-                            'https.service.port' in services['configurations']['ranger-site']['properties']:
+            elif 'ranger-site' in services['configurations'] and 'https.service.port' in services['configurations']['ranger-site']['properties']:
                 port = services['configurations']['ranger-site']['properties']['https.service.port']
         else:
             # HTTP protocol is used
             # Starting Ranger-0.5.0.2.3 port stored in ranger-admin-site ranger.service.http.port
-            if 'ranger-admin-site' in services['configurations'] and \
-                            'ranger.service.http.port' in services['configurations']['ranger-admin-site']['properties']:
+            if 'ranger-admin-site' in services['configurations'] and 'ranger.service.http.port' in services['configurations']['ranger-admin-site']['properties']:
                 port = services['configurations']['ranger-admin-site']['properties']['ranger.service.http.port']
             # In Ranger-0.4.0 port stored in ranger-site http.service.port
-            elif 'ranger-site' in services['configurations'] and \
-                            'http.service.port' in services['configurations']['ranger-site']['properties']:
+            elif 'ranger-site' in services['configurations'] and 'http.service.port' in services['configurations']['ranger-site']['properties']:
                 port = services['configurations']['ranger-site']['properties']['http.service.port']
 
         ranger_admin_hosts = self.getComponentHostNames(services, "RANGER", "RANGER_ADMIN")
@@ -672,8 +766,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                     for item in ranger_audit_dict:
                         if item['filename'] in services["configurations"] and item['configname'] in \
                                 services["configurations"][item['filename']]["properties"]:
-                            if item['filename'] in configurations and item['configname'] in \
-                                    configurations[item['filename']]["properties"]:
+                            if item['filename'] in configurations and item['configname'] in configurations[item['filename']]["properties"]:
                                 rangerAuditProperty = configurations[item['filename']]["properties"][item['configname']]
                             else:
                                 rangerAuditProperty = services["configurations"][item['filename']]["properties"][item['configname']]
@@ -2244,16 +2337,152 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         clusterEnv = getSiteProperties(configurations, "cluster-env")
         validationItems = [{"config-name": 'dfs.datanode.du.reserved', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'dfs.datanode.du.reserved')},
                            {"config-name": 'dfs.datanode.data.dir', "item": self.validatorOneDataDirPerPartition(properties, 'dfs.datanode.data.dir', services, hosts, clusterEnv)}]
+
+        # We can not access property hadoop.security.authentication from the
+        # other config (core-site). That's why we are using another heuristics here
         hdfs_site = properties
+        core_site = getSiteProperties(configurations, "core-site")
+
+        dfs_encrypt_data_transfer = 'dfs.encrypt.data.transfer'  # Hadoop Wire encryption
+        try:
+            wire_encryption_enabled = hdfs_site[dfs_encrypt_data_transfer] == "true"
+        except KeyError:
+            wire_encryption_enabled = False
+
+        HTTP_ONLY = 'HTTP_ONLY'
+        HTTPS_ONLY = 'HTTPS_ONLY'
+        HTTP_AND_HTTPS = 'HTTP_AND_HTTPS'
+
+        VALID_HTTP_POLICY_VALUES = [HTTP_ONLY, HTTPS_ONLY, HTTP_AND_HTTPS]
+        VALID_TRANSFER_PROTECTION_VALUES = ['authentication', 'integrity', 'privacy']
+
+        validationItems = []
+        address_properties = [
+            # "dfs.datanode.address",
+            # "dfs.datanode.http.address",
+            # "dfs.datanode.https.address",
+            # "dfs.datanode.ipc.address",
+            # "dfs.journalnode.http-address",
+            # "dfs.journalnode.https-address",
+            # "dfs.namenode.rpc-address",
+            # "dfs.namenode.secondary.http-address",
+            "dfs.namenode.http-address",
+            "dfs.namenode.https-address",
+        ]
+        # Validating *address properties for correct values
+
+        for address_property in address_properties:
+            if address_property in hdfs_site:
+                value = hdfs_site[address_property]
+                if not is_valid_host_port_authority(value):
+                    validationItems.append({"config-name": address_property, "item":
+                        self.getErrorItem(address_property + " does not contain a valid host:port authority: " + value)})
+
+        # Adding Ranger Plugin logic here
         ranger_plugin_properties = getSiteProperties(configurations, "ranger-hdfs-plugin-properties")
         ranger_plugin_enabled = ranger_plugin_properties['ranger-hdfs-plugin-enabled'] if ranger_plugin_properties else 'No'
+
         servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if ("RANGER" in servicesList) and (ranger_plugin_enabled.lower() == 'Yes'.lower()):
+            if 'dfs.permissions.enabled' in hdfs_site and hdfs_site['dfs.permissions.enabled'] != 'true':
+                validationItems.append({"config-name": 'dfs.permissions.enabled',
+                                        "item": self.getWarnItem("dfs.permissions.enabled needs to be set to true if Ranger HDFS Plugin is enabled.")})
+
         if ("RANGER" in servicesList) and (ranger_plugin_enabled.lower() == 'Yes'.lower()):
             if 'dfs.namenode.inode.attributes.provider.class' not in hdfs_site or \
                 hdfs_site['dfs.namenode.inode.attributes.provider.class'].lower() != 'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer'.lower():
                 validationItems.append({"config-name": 'dfs.namenode.inode.attributes.provider.class',
                                         "item": self.getWarnItem(
                                             "dfs.namenode.inode.attributes.provider.class needs to be set to 'org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer' if Ranger HDFS Plugin is enabled.")})
+
+
+        if (not wire_encryption_enabled and  # If wire encryption is enabled at Hadoop, it disables all our checks
+                    'hadoop.security.authentication' in core_site and
+                    core_site['hadoop.security.authentication'] == 'kerberos' and
+                    'hadoop.security.authorization' in core_site and
+                    core_site['hadoop.security.authorization'] == 'true'):
+            # security is enabled
+
+            dfs_http_policy = 'dfs.http.policy'
+            dfs_datanode_address = 'dfs.datanode.address'
+            datanode_http_address = 'dfs.datanode.http.address'
+            datanode_https_address = 'dfs.datanode.https.address'
+            data_transfer_protection = 'dfs.data.transfer.protection'
+
+            try:  # Params may be absent
+                privileged_dfs_dn_port = isSecurePort(getPort(hdfs_site[dfs_datanode_address]))
+            except KeyError:
+                privileged_dfs_dn_port = False
+            try:
+                privileged_dfs_http_port = isSecurePort(getPort(hdfs_site[datanode_http_address]))
+            except KeyError:
+                privileged_dfs_http_port = False
+            try:
+                privileged_dfs_https_port = isSecurePort(getPort(hdfs_site[datanode_https_address]))
+            except KeyError:
+                privileged_dfs_https_port = False
+            try:
+                dfs_http_policy_value = hdfs_site[dfs_http_policy]
+            except KeyError:
+                dfs_http_policy_value = HTTP_ONLY  # Default
+            try:
+                data_transfer_protection_value = hdfs_site[data_transfer_protection]
+            except KeyError:
+                data_transfer_protection_value = None
+
+            if dfs_http_policy_value not in VALID_HTTP_POLICY_VALUES:
+                validationItems.append({"config-name": dfs_http_policy,
+                                        "item": self.getWarnItem(
+                                            "Invalid property value: {0}. Valid values are {1}".format(
+                                                dfs_http_policy_value, VALID_HTTP_POLICY_VALUES))})
+
+            # determine whether we use secure ports
+            address_properties_with_warnings = []
+            if dfs_http_policy_value == HTTPS_ONLY:
+                if not privileged_dfs_dn_port and (
+                    privileged_dfs_https_port or datanode_https_address not in hdfs_site):
+                    important_properties = [dfs_datanode_address, datanode_https_address]
+                    message = "You set up datanode to use some non-secure ports. " \
+                              "If you want to run Datanode under non-root user in a secure cluster, " \
+                              "you should set all these properties {2} " \
+                              "to use non-secure ports (if property {3} does not exist, " \
+                              "just add it). You may also set up property {4} ('{5}' is a good default value). " \
+                              "Also, set up WebHDFS with SSL as " \
+                              "described in manual in order to be able to " \
+                              "use HTTPS.".format(dfs_http_policy, dfs_http_policy_value, important_properties,
+                                                  datanode_https_address, data_transfer_protection,
+                                                  VALID_TRANSFER_PROTECTION_VALUES[0])
+                    address_properties_with_warnings.extend(important_properties)
+            else:  # dfs_http_policy_value == HTTP_AND_HTTPS or HTTP_ONLY
+                # We don't enforce datanode_https_address to use privileged ports here
+                any_nonprivileged_ports_are_in_use = not privileged_dfs_dn_port or not privileged_dfs_http_port
+                if any_nonprivileged_ports_are_in_use:
+                    important_properties = [dfs_datanode_address, datanode_http_address]
+                    message = "You have set up datanode to use some non-secure ports, but {0} is set to {1}. " \
+                              "In a secure cluster, Datanode forbids using non-secure ports " \
+                              "if {0} is not set to {3}. " \
+                              "Please make sure that properties {2} use secure ports.".format(
+                        dfs_http_policy, dfs_http_policy_value, important_properties, HTTPS_ONLY)
+                    address_properties_with_warnings.extend(important_properties)
+
+            # Generate port-related warnings if any
+            for prop in address_properties_with_warnings:
+                validationItems.append({"config-name": prop,
+                                        "item": self.getWarnItem(message)})
+
+            # Check if it is appropriate to use dfs.data.transfer.protection
+            if data_transfer_protection_value is not None:
+                if dfs_http_policy_value in [HTTP_ONLY, HTTP_AND_HTTPS]:
+                    validationItems.append({"config-name": data_transfer_protection,
+                                            "item": self.getWarnItem(
+                                                "{0} property can not be used when {1} is set to any "
+                                                "value other then {2}. Tip: When {1} property is not defined, it defaults to {3}".format(
+                                                    data_transfer_protection, dfs_http_policy, HTTPS_ONLY, HTTP_ONLY))})
+                elif not data_transfer_protection_value in VALID_TRANSFER_PROTECTION_VALUES:
+                    validationItems.append({"config-name": data_transfer_protection,
+                                            "item": self.getWarnItem(
+                                                "Invalid property value: {0}. Valid values are {1}.".format(
+                                                    data_transfer_protection_value, VALID_TRANSFER_PROTECTION_VALUES))})
 
         return self.toConfigurationValidationProblems(validationItems, "hdfs-site")
 
@@ -2817,3 +3046,14 @@ def getMemorySizeRequired(components, configurations):
 
 def round_to_n(mem_size, n=128):
     return int(round(mem_size / float(n))) * int(n)
+def is_valid_host_port_authority(target):
+  has_scheme = "://" in target
+  if not has_scheme:
+    target = "dummyscheme://"+target
+  try:
+    result = urlparse(target)
+    if result.hostname is not None and result.port is not None:
+      return True
+  except ValueError:
+    pass
+  return False
