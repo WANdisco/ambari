@@ -101,9 +101,11 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         # for debug:
         putYarnProperty("yarn.nodemanager.delete.debug-delay-sec", "60000")
 
-        nodemanagerMinRam = 1048576 # 1TB in mb
+        #2.0.6 stack
+        nodemanagerMinRam = 1048576  # 1TB in mb
         if "referenceNodeManagerHost" in clusterData:
-            nodemanagerMinRam = min(clusterData["referenceNodeManagerHost"]["total_mem"]/1024, nodemanagerMinRam)
+            nodemanagerMinRam = min(clusterData["referenceNodeManagerHost"]["total_mem"] / 1024, nodemanagerMinRam)
+
         putYarnProperty('yarn.nodemanager.resource.memory-mb', int(round(min(clusterData['containers'] * clusterData['ramPerContainer'], nodemanagerMinRam))))
         putYarnProperty('yarn.scheduler.minimum-allocation-mb', int(clusterData['ramPerContainer']))
         putYarnProperty('yarn.scheduler.maximum-allocation-mb', int(configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.memory-mb"]))
@@ -128,9 +130,59 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             if old_ambari_user is not None:
                 putYarnPropertyAttribute("yarn.timeline-service.http-authentication.proxyuser.{0}.hosts".format(old_ambari_user), 'delete', 'true')
                 putYarnPropertyAttribute("yarn.timeline-service.http-authentication.proxyuser.{0}.groups".format(old_ambari_user), 'delete', 'true')
+        #end of 2.0.6 stack
 
-        if "ranger-env" in services["configurations"] and "ranger-yarn-plugin-properties" in services[
-            "configurations"] and \
+        # HDP 2.2
+        putYarnProperty('yarn.nodemanager.resource.cpu-vcores', clusterData['cpu'])
+        putYarnProperty('yarn.scheduler.minimum-allocation-vcores', 1)
+        putYarnProperty('yarn.scheduler.maximum-allocation-vcores', configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.cpu-vcores"])
+        nodeManagerHost = self.getHostWithComponent("YARN", "NODEMANAGER", services, hosts)
+        if (nodeManagerHost is not None):
+            cpuPercentageLimit = 0.8
+            if "yarn.nodemanager.resource.percentage-physical-cpu-limit" in configurations["yarn-site"]["properties"]:
+                cpuPercentageLimit = float(configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.percentage-physical-cpu-limit"])
+            cpuLimit = max(1, int(floor(nodeManagerHost["Hosts"]["cpu_count"] * cpuPercentageLimit)))
+            putYarnProperty('yarn.nodemanager.resource.cpu-vcores', str(cpuLimit))
+            putYarnProperty('yarn.scheduler.maximum-allocation-vcores', configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.cpu-vcores"])
+            putYarnPropertyAttribute('yarn.nodemanager.resource.memory-mb', 'maximum', int(nodeManagerHost["Hosts"]["total_mem"] / 1024))  # total_mem in kb
+            putYarnPropertyAttribute('yarn.nodemanager.resource.cpu-vcores', 'maximum', nodeManagerHost["Hosts"]["cpu_count"] * 2)
+            putYarnPropertyAttribute('yarn.scheduler.minimum-allocation-vcores', 'maximum', configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.cpu-vcores"])
+            putYarnPropertyAttribute('yarn.scheduler.maximum-allocation-vcores', 'maximum', configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.cpu-vcores"])
+            putYarnPropertyAttribute('yarn.scheduler.minimum-allocation-mb', 'maximum', configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.memory-mb"])
+            putYarnPropertyAttribute('yarn.scheduler.maximum-allocation-mb', 'maximum', configurations["yarn-site"]["properties"]["yarn.nodemanager.resource.memory-mb"])
+
+            # removed part of the code from 2.2 in order to avoid misconfig of yarn.scheduler.maximum-allocation-mb and yarn.scheduler.minimum-allocation-mb
+
+            kerberos_authentication_enabled = self.isSecurityEnabled(services)
+            if kerberos_authentication_enabled:
+                putYarnProperty('yarn.nodemanager.container-executor.class', 'org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor')
+
+            if "yarn-env" in services["configurations"] and "yarn_cgroups_enabled" in services["configurations"]["yarn-env"]["properties"]:
+                yarn_cgroups_enabled = services["configurations"]["yarn-env"]["properties"]["yarn_cgroups_enabled"].lower() == "true"
+                if yarn_cgroups_enabled:
+                    putYarnProperty('yarn.nodemanager.container-executor.class', 'org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor')
+                    putYarnProperty('yarn.nodemanager.container-executor.group', 'hadoop')
+                    putYarnProperty('yarn.nodemanager.container-executor.resources-handler.class', 'org.apache.hadoop.yarn.server.nodemanager.util.CgroupsLCEResourcesHandler')
+                    putYarnProperty('yarn.nodemanager.container-executor.cgroups.hierarchy', ' /yarn')
+                    putYarnProperty('yarn.nodemanager.container-executor.cgroups.mount', 'true')
+                    putYarnProperty('yarn.nodemanager.linux-container-executor.cgroups.mount-path', '/cgroup')
+                else:
+                    if not kerberos_authentication_enabled:
+                        putYarnProperty('yarn.nodemanager.container-executor.class', 'org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor')
+                    putYarnPropertyAttribute('yarn.nodemanager.container-executor.resources-handler.class', 'delete', 'true')
+                    putYarnPropertyAttribute('yarn.nodemanager.container-executor.cgroups.hierarchy', 'delete', 'true')
+                    putYarnPropertyAttribute('yarn.nodemanager.container-executor.cgroups.mount', 'delete', 'true')
+                    putYarnPropertyAttribute('yarn.nodemanager.linux-container-executor.cgroups.mount-path', 'delete', 'true')
+        # recommend hadoop.registry.rm.enabled based on SLIDER in services
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        if "SLIDER" in servicesList:
+            putYarnProperty('hadoop.registry.rm.enabled', 'true')
+        else:
+            putYarnProperty('hadoop.registry.rm.enabled', 'false')
+
+        # end of HDP 2.2 stack
+
+        # HDP 2.3 stack
                         "ranger-yarn-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
             putYarnRangerPluginProperty = self.putProperty(configurations, "ranger-yarn-plugin-properties", services)
             rangerEnvYarnPluginProperty = services["configurations"]["ranger-env"]["properties"][
@@ -163,9 +215,11 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                     putYarnProperty('yarn.resourcemanager.proxy-user-privileges.enabled', 'false')
             else:
                 putYarnProperty('yarn.resourcemanager.proxy-user-privileges.enabled', 'false')
+         # end of HDP 2.3 stack
 
     def recommendMapReduce2Configurations(self, configurations, clusterData, services, hosts):
         putMapredProperty = self.putProperty(configurations, "mapred-site", services)
+        # 2.0.6 stack
         putMapredProperty('yarn.app.mapreduce.am.resource.mb', int(clusterData['amMemory']))
         putMapredProperty('yarn.app.mapreduce.am.command-opts', "-Xmx" + str(int(round(0.8 * clusterData['amMemory']))) + "m")
         putMapredProperty('mapreduce.map.memory.mb', clusterData['mapMemory'])
@@ -176,6 +230,47 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         mr_queue = self.recommendYarnQueue(services, "mapred-site", "mapreduce.job.queuename")
         if mr_queue is not None:
             putMapredProperty("mapreduce.job.queuename", mr_queue)
+        #end of 2.0.6 stack
+
+        # 2.2 stack
+        self.recommendYARNConfigurations(configurations, clusterData, services, hosts)
+        nodemanagerMinRam = 1048576  # 1TB in mb
+        if "referenceNodeManagerHost" in clusterData:
+            nodemanagerMinRam = min(clusterData["referenceNodeManagerHost"]["total_mem"] / 1024, nodemanagerMinRam)
+
+        putMapredProperty('yarn.app.mapreduce.am.resource.mb', configurations["yarn-site"]["properties"]["yarn.scheduler.minimum-allocation-mb"])
+        putMapredProperty('yarn.app.mapreduce.am.command-opts', "-Xmx" + str(int(0.8 * int(configurations["mapred-site"]["properties"]["yarn.app.mapreduce.am.resource.mb"]))) + "m")
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        min_mapreduce_map_memory_mb = 0
+        min_mapreduce_reduce_memory_mb = 0
+        min_mapreduce_map_java_opts = 0
+        if ("PIG" in servicesList) and clusterData["totalAvailableRam"] >= 4096:
+            min_mapreduce_map_memory_mb = 1536
+            min_mapreduce_reduce_memory_mb = 1536
+            min_mapreduce_map_java_opts = 1024
+        putMapredProperty('mapreduce.map.memory.mb', min(int(configurations["yarn-site"]["properties"]["yarn.scheduler.maximum-allocation-mb"]),
+                          max(min_mapreduce_map_memory_mb, int(configurations["yarn-site"]["properties"]["yarn.scheduler.minimum-allocation-mb"]))))
+        putMapredProperty('mapreduce.reduce.memory.mb', min(int(configurations["yarn-site"]["properties"]["yarn.scheduler.maximum-allocation-mb"]),
+                          max(min_mapreduce_reduce_memory_mb, min(2 * int(configurations["yarn-site"]["properties"]["yarn.scheduler.minimum-allocation-mb"]), int(nodemanagerMinRam)))))
+        mapredMapXmx = int(0.8 * int(configurations["mapred-site"]["properties"]["mapreduce.map.memory.mb"]));
+        putMapredProperty('mapreduce.map.java.opts', "-Xmx" + str(max(min_mapreduce_map_java_opts, mapredMapXmx)) + "m")
+        putMapredProperty('mapreduce.reduce.java.opts', "-Xmx" + str(int(0.8 * int(configurations["mapred-site"]["properties"]["mapreduce.reduce.memory.mb"]))) + "m")
+        putMapredProperty('mapreduce.task.io.sort.mb', str(min(int(0.7 * mapredMapXmx), 2047)))
+        # Property Attributes
+        putMapredPropertyAttribute = self.putPropertyAttribute(configurations, "mapred-site")
+        yarnMinAllocationSize = int(configurations["yarn-site"]["properties"]["yarn.scheduler.minimum-allocation-mb"])
+        yarnMaxAllocationSize = min(30 * int(configurations["yarn-site"]["properties"]["yarn.scheduler.minimum-allocation-mb"]),
+            int(configurations["yarn-site"]["properties"]["yarn.scheduler.maximum-allocation-mb"]))
+        putMapredPropertyAttribute("mapreduce.map.memory.mb", "maximum", yarnMaxAllocationSize)
+        putMapredPropertyAttribute("mapreduce.map.memory.mb", "minimum", yarnMinAllocationSize)
+        putMapredPropertyAttribute("mapreduce.reduce.memory.mb", "maximum", yarnMaxAllocationSize)
+        putMapredPropertyAttribute("mapreduce.reduce.memory.mb", "minimum", yarnMinAllocationSize)
+        putMapredPropertyAttribute("yarn.app.mapreduce.am.resource.mb", "maximum", yarnMaxAllocationSize)
+        putMapredPropertyAttribute("yarn.app.mapreduce.am.resource.mb", "minimum", yarnMinAllocationSize)
+        # Hadoop MR limitation
+        putMapredPropertyAttribute("mapreduce.task.io.sort.mb", "maximum", "2047")
+        # end of 2.2 stack
+
 
     def getAmbariUser(self, services):
         ambari_user = services['ambari-server-properties']['ambari-server.user']
@@ -2076,6 +2171,24 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                             {"config-name": 'yarn.app.mapreduce.am.resource.mb', "item": self.validatorLessThenDefaultValue(properties, recommendedDefaults, 'yarn.app.mapreduce.am.resource.mb')},
                             {"config-name": 'yarn.app.mapreduce.am.command-opts', "item": self.validateXmxValue(properties, recommendedDefaults, 'yarn.app.mapreduce.am.command-opts')},
                             {"config-name": 'mapreduce.job.queuename', "item": self.validatorYarnQueue(properties, recommendedDefaults, 'mapreduce.job.queuename', services)} ]
+
+        if 'mapreduce.map.java.opts' in properties and checkXmxValueFormat(properties['mapreduce.map.java.opts']):
+            mapreduceMapJavaOpts = formatXmxSizeToBytes(getXmxSize(properties['mapreduce.map.java.opts'])) / (1024.0 * 1024)
+            mapreduceMapMemoryMb = to_number(properties['mapreduce.map.memory.mb'])
+            if mapreduceMapJavaOpts > mapreduceMapMemoryMb:
+                validationItems.append({"config-name": 'mapreduce.map.java.opts', "item": self.getWarnItem("mapreduce.map.java.opts Xmx should be less than mapreduce.map.memory.mb ({0})".format(mapreduceMapMemoryMb))})
+
+        if 'mapreduce.reduce.java.opts' in properties and checkXmxValueFormat(properties['mapreduce.reduce.java.opts']):
+            mapreduceReduceJavaOpts = formatXmxSizeToBytes(getXmxSize(properties['mapreduce.reduce.java.opts'])) / (1024.0 * 1024)
+            mapreduceReduceMemoryMb = to_number(properties['mapreduce.reduce.memory.mb'])
+            if mapreduceReduceJavaOpts > mapreduceReduceMemoryMb:
+                validationItems.append({"config-name": 'mapreduce.reduce.java.opts', "item": self.getWarnItem("mapreduce.reduce.java.opts Xmx should be less than mapreduce.reduce.memory.mb ({0})".format(mapreduceReduceMemoryMb))})
+
+        if 'yarn.app.mapreduce.am.command-opts' in properties and checkXmxValueFormat(properties['yarn.app.mapreduce.am.command-opts']):
+            yarnAppMapreduceAmCommandOpts = formatXmxSizeToBytes(getXmxSize(properties['yarn.app.mapreduce.am.command-opts'])) / (1024.0 * 1024)
+            yarnAppMapreduceAmResourceMb = to_number(properties['yarn.app.mapreduce.am.resource.mb'])
+            if yarnAppMapreduceAmCommandOpts > yarnAppMapreduceAmResourceMb: validationItems.append({"config-name": 'yarn.app.mapreduce.am.command-opts', "item": self.getWarnItem("yarn.app.mapreduce.am.command-opts Xmx should be less than yarn.app.mapreduce.am.resource.mb ({0})".format(yarnAppMapreduceAmResourceMb))})
+
         return self.toConfigurationValidationProblems(validationItems, "mapred-site")
 
     def validateYARNConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
