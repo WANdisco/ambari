@@ -22,9 +22,10 @@
     <schemaVersion>2.0</schemaVersion>
     <services>
         <service>
-            <name>SPARK</name>
-            <extends>common-services/SPARK/1.5.2</extends>
-            <version>1.6.3</version>
+            <name>SPARK2</name>
+            <displayName>Spark</displayName>
+            <extends>common-services/SPARK2/2.0.0</extends>
+            <version>2.0.2</version>
             <osSpecifics>
                 <osSpecific>
                     <osFamily>redhat6,redhat7</osFamily>

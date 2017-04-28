@@ -58,7 +58,7 @@
     {
       "name": "tez_for_spark",
       "description": "Tez dependency for Spark",
-      "max_version": "0.0"
+      "min_version": "2.8"
     },
     {
       "name": "timeline_state_store",
@@ -73,7 +73,7 @@
     {
       "name": "spark_16plus",
       "description": "Spark 1.6+",
-      "max_version": "0.0"
+      "min_version": "2.8"
     },
     {
       "name": "spark_thriftserver",
