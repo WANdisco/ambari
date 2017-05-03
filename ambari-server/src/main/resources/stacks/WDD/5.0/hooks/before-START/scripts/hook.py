@@ -26,6 +26,11 @@ def setup_hadoop_env():
              to=params.hadoop_conf_empty_dir,
              not_if=format("ls {hadoop_conf_dir}")
              )
+        File(os.path.join(params.hadoop_conf_dir, "hadoop-metrics2.properties"),
+             owner=params.hdfs_user,
+             group=params.user_group,
+             content=Template("hadoop-metrics2.properties.j2")
+             )
         File(os.path.join(params.hadoop_conf_dir, 'hadoop-env.sh'),
              owner=tc_owner,
              content=InlineTemplate(params.hadoop_env_sh_template)
