@@ -28,8 +28,6 @@ class AmsMonitor(Script):
     import params
     env.set_params(params)
     self.install_packages(env)
-    cmd = format("yes | pip install psutil")
-    Execute(cmd)
     self.configure(env) # for security
 
   def configure(self, env):
