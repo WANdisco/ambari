@@ -24,6 +24,7 @@
         <service>
             <name>SPARK2</name>
             <displayName>Spark</displayName>
+            <comment>Apache Spark 2.0 is a fast and general engine for large-scale data processing.</comment>
             <extends>common-services/SPARK2/2.0.0</extends>
             <version>2.0.2</version>
             <osSpecifics>
