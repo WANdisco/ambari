@@ -22,7 +22,7 @@
     <service id="RANGER-062" name="RANGER" version="0.6.2"/>
     <service id="RANGER_KMS-062" name="RANGER_KMS" version="0.6.2"/>
     <service id="SLIDER-08001" name="SLIDER" version="0.80.0-1"/>
-    <service id="HIVE-211" name="HIVE" version="2.1.1"/>
+    <service id="HIVE-121" name="HIVE" version="1.2.1"/>
   </manifest>
   <available-services/>
   <repository-info>

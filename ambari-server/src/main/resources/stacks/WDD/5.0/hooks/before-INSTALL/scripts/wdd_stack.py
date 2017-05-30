@@ -19,7 +19,6 @@ def setup_nsn_distro():
         "hadoop-mapreduce": "hadoop",
         "hadoop-mapreduce-client": "hadoop-mapreduce",
         "hadoop-yarn-client": "hadoop-yarn",
-        "hive2": "hive",
         "hive-hcatalog": "hive/hcatalog",
         "spark2": "spark",
         "storm-slider-client": "slider",
@@ -39,7 +38,7 @@ def setup_nsn_distro():
         "tez_hive2": "tez"
     }
 
-    nsn_components = ["tez", "hadoop", "zookeeper", "hbase", "hive", "slider", "sqoop", "spark", "storm", "ranger"]
+    nsn_components = ["tez", "hadoop", "zookeeper", "hbase", "hive", "slider", "sqoop", "spark", "storm", "ranger", "hive2" ]
 
     Directory(
         stack_path,
