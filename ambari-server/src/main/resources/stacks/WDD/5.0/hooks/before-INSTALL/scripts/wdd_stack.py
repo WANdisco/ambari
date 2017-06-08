@@ -22,6 +22,7 @@ def setup_nsn_distro():
         "hive-hcatalog": "hive/hcatalog",
         "spark2": "spark",
         "storm-slider-client": "slider",
+        "knox-server": "knox",
         "ranger-admin": "ranger/ranger-admin",
         "ranger-kms": "ranger/ranger-kms",
         "ranger-tagsync": "ranger/ranger-tagsync",
@@ -38,7 +39,7 @@ def setup_nsn_distro():
         "tez_hive2": "tez"
     }
 
-    nsn_components = ["tez", "hadoop", "zookeeper", "hbase", "hive", "slider", "sqoop", "spark", "storm", "ranger", "hive2" ]
+    nsn_components = ["tez", "hadoop", "zookeeper", "hbase", "hive", "slider", "sqoop", "spark", "storm", "ranger", "hive2", "knox" ]
 
     Directory(
         stack_path,

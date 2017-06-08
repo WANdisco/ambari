@@ -15,6 +15,7 @@ from resource_management.core.exceptions import Fail
 from resource_management.libraries.functions.mounted_dirs_helper import get_mounts_with_multiple_data_dirs
 from resource_management.libraries.functions.get_bare_principal import get_bare_principal
 from urlparse import urlparse
+import xml.etree.ElementTree as ET
 
 from stack_advisor import DefaultStackAdvisor
 
@@ -94,8 +95,83 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             "RANGER": self.recommendRangerConfigurations,
             "RANGER_KMS": self.recommendRangerKMSConfigurations,
             "HIVE": self.recommendHiveConfigurations,
+            "KNOX": self.recommendKnoxConfigurations,
             "KAFKA": self.recommendKAFKAConfigurations,
         }
+
+    def recommendKnoxConfigurations(self, configurations, clusterData, services, hosts):
+        if "ranger-env" in services["configurations"] and "ranger-knox-plugin-properties" in services[
+            "configurations"] and \
+                        "ranger-knox-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
+            putKnoxRangerPluginProperty = self.putProperty(configurations, "ranger-knox-plugin-properties", services)
+            rangerEnvKnoxPluginProperty = services["configurations"]["ranger-env"]["properties"][
+                "ranger-knox-plugin-enabled"]
+            putKnoxRangerPluginProperty("ranger-knox-plugin-enabled", rangerEnvKnoxPluginProperty)
+
+        if 'topology' in services["configurations"] and 'content' in services["configurations"]["topology"][
+            "properties"]:
+            putKnoxTopologyContent = self.putProperty(configurations, "topology", services)
+            rangerPluginEnabled = ''
+            if 'ranger-knox-plugin-properties' in configurations and 'ranger-knox-plugin-enabled' in \
+                    configurations['ranger-knox-plugin-properties']['properties']:
+                rangerPluginEnabled = configurations['ranger-knox-plugin-properties']['properties'][
+                    'ranger-knox-plugin-enabled']
+            elif 'ranger-knox-plugin-properties' in services['configurations'] and 'ranger-knox-plugin-enabled' in \
+                    services['configurations']['ranger-knox-plugin-properties']['properties']:
+                rangerPluginEnabled = services['configurations']['ranger-knox-plugin-properties']['properties'][
+                    'ranger-knox-plugin-enabled']
+
+            # check if authorization provider already added
+            topologyContent = services["configurations"]["topology"]["properties"]["content"]
+            authorizationProviderExists = False
+            authNameChanged = False
+            root = ET.fromstring(topologyContent)
+            if root is not None:
+                gateway = root.find("gateway")
+                if gateway is not None:
+                    for provider in gateway.findall('provider'):
+                        role = provider.find('role')
+                        if role is not None and role.text and role.text.lower() == "authorization":
+                            authorizationProviderExists = True
+
+                        name = provider.find('name')
+                        if name is not None and name.text == "AclsAuthz" and rangerPluginEnabled \
+                                and rangerPluginEnabled.lower() == "Yes".lower():
+                            newAuthName = "XASecurePDPKnox"
+                            authNameChanged = True
+                        elif name is not None and (
+                            ((not rangerPluginEnabled) or rangerPluginEnabled.lower() != "Yes".lower()) \
+                                and name.text == 'XASecurePDPKnox'):
+                            newAuthName = "AclsAuthz"
+                            authNameChanged = True
+
+                        if authNameChanged:
+                            name.text = newAuthName
+                            putKnoxTopologyContent('content', ET.tostring(root))
+
+                        if authorizationProviderExists:
+                            break
+
+            if not authorizationProviderExists:
+                if root is not None:
+                    gateway = root.find("gateway")
+                    if gateway is not None:
+                        provider = ET.SubElement(gateway, 'provider')
+
+                        role = ET.SubElement(provider, 'role')
+                        role.text = "authorization"
+
+                        name = ET.SubElement(provider, 'name')
+                        if rangerPluginEnabled and rangerPluginEnabled.lower() == "Yes".lower():
+                            name.text = "XASecurePDPKnox"
+                        else:
+                            name.text = "AclsAuthz"
+
+                        enabled = ET.SubElement(provider, 'enabled')
+                        enabled.text = "true"
+
+                        # TODO add pretty format for newly added provider
+                        putKnoxTopologyContent('content', ET.tostring(root))
 
     def recommendKAFKAConfigurations(self, configurations, clusterData, services, hosts):
 
@@ -2022,6 +2098,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                                "ams-hbase-env": self.validateAmsHbaseEnvConfigurations,
                                "ams-site": self.validateAmsSiteConfigurations,
                                "ams-env": self.validateAmsEnvConfigurations},
+            "KNOX": {"ranger-knox-plugin-properties": self.validateKnoxRangerPluginConfigurations},
             "KAKFA": {"kafka-broker": self.validateKAFKAConfigurations}
         }
 
@@ -2812,6 +2889,19 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 validationItems.append({"config-name": 'ranger-hbase-plugin-enabled', "item": self.getWarnItem(
                                             "ranger-hbase-plugin-properties/ranger-hbase-plugin-enabled must correspond ranger-env/ranger-hbase-plugin-enabled")})
         return self.toConfigurationValidationProblems(validationItems, "ranger-hbase-plugin-properties")
+
+    def validateKnoxRangerPluginConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = []
+        servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
+        ranger_plugin_properties = getSiteProperties(configurations, "ranger-knox-plugin-properties")
+        ranger_plugin_enabled = ranger_plugin_properties['ranger-knox-plugin-enabled'] if ranger_plugin_properties else 'No'
+        if 'RANGER' in servicesList and ranger_plugin_enabled.lower() == 'yes':
+            # ranger-hdfs-plugin must be enabled in ranger-env
+            ranger_env = getServicesSiteProperties(services, 'ranger-env')
+            if not ranger_env or not 'ranger-knox-plugin-enabled' in ranger_env or ranger_env['ranger-knox-plugin-enabled'].lower() != 'yes':
+                validationItems.append({"config-name": 'ranger-knox-plugin-enabled',
+                                        "item": self.getWarnItem("ranger-knox-plugin-properties/ranger-knox-plugin-enabled must correspond ranger-env/ranger-knox-plugin-enabled")})
+        return self.toConfigurationValidationProblems(validationItems, "ranger-knox-plugin-properties")
 
     def validateHDFSConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
         clusterEnv = getSiteProperties(configurations, "cluster-env")
