@@ -31,7 +31,7 @@
               <name>hive_${stack_version}</name>
             </package>
             <package>
-              <name>hive2</name>
+              <name>hive2_${stack_version}</name>
             </package>
             <package>
               <name>mysql-connector-java</name>
