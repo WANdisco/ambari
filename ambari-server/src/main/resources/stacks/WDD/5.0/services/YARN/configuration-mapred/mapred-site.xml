@@ -38,7 +38,7 @@
   </property>
   <property>
     <name>mapreduce.application.framework.path</name>
-    <value>/wdd/apps/5.0.0.0-0/mapreduce/mapreduce.tar.gz#mr-framework</value>
+    <value>/wdd/apps/5.0.0.0-1/mapreduce/mapreduce.tar.gz#mr-framework</value>
     <description/>
     <on-ambari-upgrade add="true"/>
   </property>

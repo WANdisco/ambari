@@ -1,4 +1,4 @@
 {
-  "stack_selector": ["wdd-select", "/opt/nsn/ngdb/wdd/wdd-select", "wdd-select"],
-  "conf_selector": ["conf-select", "/opt/nsn/ngdb/wdd/conf-select", "conf-select"]
+  "stack_selector": ["wdd-select", "/opt/nsn/ngdb/wdd-select/wdd-select", "wdd-select"],
+  "conf_selector": ["conf-select", "/opt/nsn/ngdb/wdd-select/conf-select", "conf-select"]
 }

@@ -37,10 +37,10 @@
           <osFamily>any</osFamily>
           <packages>
             <package>
-              <name>hadoop</name>
+              <name>hadoop_${stack_version}</name>
             </package>
             <package>
-              <name>ranger</name>
+              <name>ranger_${stack_version}</name>
             </package>
             <package>
               <name>bigtop-jsvc</name>

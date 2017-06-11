@@ -22,6 +22,17 @@
       <name>TEZ</name>
       <extends>common-services/TEZ/0.4.0.2.1</extends>
       <version>0.7.1</version>
+
+      <osSpecifics>
+        <osSpecific>
+          <osFamily>any</osFamily>
+          <packages>
+            <package>
+              <name>tez_${stack_version}</name>
+            </package>
+          </packages>
+        </osSpecific>
+      </osSpecifics>
     </service>
   </services>
 </metainfo>

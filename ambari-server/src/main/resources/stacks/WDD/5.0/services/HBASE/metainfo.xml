@@ -30,6 +30,18 @@
         </quickLinksConfiguration>
       </quickLinksConfigurations>
 
+
+      <osSpecifics>
+        <osSpecific>
+          <osFamily>any</osFamily>
+          <packages>
+            <package>
+              <name>hbase_${stack_version}</name>
+            </package>
+          </packages>
+        </osSpecific>
+      </osSpecifics>
+
       <themes>
         <theme>
           <fileName>theme.json</fileName>

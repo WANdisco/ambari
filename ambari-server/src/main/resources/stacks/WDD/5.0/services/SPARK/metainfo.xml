@@ -32,7 +32,7 @@
                     <osFamily>redhat6,redhat7</osFamily>
                     <packages>
                         <package>
-                            <name>spark</name>
+                            <name>spark_${stack_version}</name>
                         </package>
                     </packages>
                 </osSpecific>

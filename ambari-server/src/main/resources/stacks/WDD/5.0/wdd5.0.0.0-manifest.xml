@@ -3,11 +3,11 @@
   <release>
     <type>STANDARD</type>
     <stack-id>WDD-5.0</stack-id>
-    <version>5.0.0</version>
+    <version>5.0.0.0</version>
     <build>1</build>
     <compatible-with>5.0</compatible-with>
     <release-notes>http://example.com</release-notes>
-    <display>WDD-5.0.0</display>
+    <display>WDD-5.0.0.0</display>
   </release>
   <manifest>
     <service id="HBASE-112" name="HBASE" version="1.1.2"/>
@@ -27,19 +27,29 @@
   <available-services/>
   <repository-info>
     <os family="redhat6">
-      <!--<package-version>2_5_3_0_*</package-version>-->
+      <package-version>5_0_0_0_*</package-version>
       <repo>
-        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0</baseurl>
-        <repoid>WDD-5.0</repoid>
+        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+        <repoid>WDD-5.0.0.0</repoid>
         <reponame>WDD</reponame>
+      </repo>
+      <repo>
+        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd-utils</baseurl>
+        <repoid>WDD-UTILS</repoid>
+        <reponame>WDD-UTILS</reponame>
       </repo>
     </os>
     <os family="redhat7">
-      <!--<package-version>2_5_3_0_*</package-version>-->
+      <package-version>5_0_0_0_*</package-version>
       <repo>
-        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0</baseurl>
-        <repoid>WDD-5.0</repoid>
+        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+        <repoid>WDD-5.0.0.0</repoid>
         <reponame>WDD</reponame>
+      </repo>
+      <repo>
+        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd-utils</baseurl>
+        <repoid>WDD-UTILS</repoid>
+        <reponame>WDD-UTILS</reponame>
       </repo>
     </os>
   </repository-info>

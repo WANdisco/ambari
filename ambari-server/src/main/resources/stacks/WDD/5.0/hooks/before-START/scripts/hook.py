@@ -106,9 +106,10 @@ def copy_container_executor_cfg():
     import params
     destination = format("{hadoop_home}/etc/hadoop/container-executor.cfg")
 
-    Link(os.path.join(params.hadoop_conf_dir, "container-executor.cfg"),
-        to=destination,
-        )
+    if os.path.exists(params.hadoop_conf_dir) and os.path.exists(params.hadoop_home):
+      Link(os.path.join(params.hadoop_conf_dir, "container-executor.cfg"),
+          to=destination,
+          )
 
 class BeforeStartHook(Hook):
     def hook(self, env):

@@ -30,7 +30,7 @@
           <osFamily>any</osFamily>
           <packages>
             <package>
-              <name>zookeeper</name>
+              <name>zookeeper_${stack_version}</name>
             </package>
           </packages>
         </osSpecific>

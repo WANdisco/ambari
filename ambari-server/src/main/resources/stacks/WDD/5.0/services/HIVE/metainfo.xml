@@ -28,7 +28,7 @@
           <osFamily>redhat6,redhat7</osFamily>
           <packages>
             <package>
-              <name>hive</name>
+              <name>hive_${stack_version}</name>
             </package>
             <package>
               <name>hive2</name>

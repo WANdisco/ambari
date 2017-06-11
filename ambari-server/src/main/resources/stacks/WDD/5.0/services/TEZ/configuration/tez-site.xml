@@ -19,7 +19,7 @@
 <configuration supports_final="true">
   <property>
     <name>tez.lib.uris</name>
-    <value>hdfs:///wdd/apps/5.0.0.0-0/tez/tez.tar.gz</value>
+    <value>hdfs:///wdd/apps/5.0.0.0-1/tez/tez.tar.gz</value>
     <description>The location of the Tez libraries which will be localized for DAGs</description>
     <on-ambari-upgrade add="true"/>
   </property>

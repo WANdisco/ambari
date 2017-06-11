@@ -1,9 +1,9 @@
 import fnmatch
 import os
 from resource_management import *
+import wdd_stack
 
 nsn_distro_root = "/opt/nsn/ngdb"
-wdd_stack_version = "5.0.0.0-0"
 
 
 def setup_stack_log_dirs():
@@ -48,16 +48,17 @@ def patch_hadoop_config():
              content=StaticFile('hadoop-config.sh'),
              mode=0755)
 
-    hadoop_yarn_apps_distributedshell = os.path.join(hadoop_dir, "hadoop-yarn-applications-distributedshell.jar")
-    if not os.path.exists(hadoop_yarn_apps_distributedshell):
-        File(hadoop_yarn_apps_distributedshell,
-             content=StaticFile('hadoop-yarn-applications-distributedshell.jar'),
-             mode=0755)
+    if os.path.exists(hadoop_dir):
+        hadoop_yarn_apps_distributedshell = os.path.join(hadoop_dir, "hadoop-yarn-applications-distributedshell.jar")
+        if not os.path.exists(hadoop_yarn_apps_distributedshell):
+            File(hadoop_yarn_apps_distributedshell,
+                 content=StaticFile('hadoop-yarn-applications-distributedshell.jar'),
+                 mode=0755)
 
-    hadoop_mapreduce_examples_jar = find_hadoop_mapreduce_examples(hadoop_dir)
-    if hadoop_mapreduce_examples_jar is not None:
-        File(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
-             content=StaticFile(hadoop_mapreduce_examples_jar))
+        hadoop_mapreduce_examples_jar = find_hadoop_mapreduce_examples(hadoop_dir)
+        if hadoop_mapreduce_examples_jar is not None:
+            File(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
+                 content=StaticFile(hadoop_mapreduce_examples_jar))
 
 
 def setup_user_environment():
@@ -106,6 +107,7 @@ def create_spark_tmp_dir():
 
 class AfterInstallHook(Hook):
     def hook(self, env):
+        wdd_stack.setup()
         setup_stack_log_dirs()
         link_config_scripts()
         patch_hadoop_config()

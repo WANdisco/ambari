@@ -20,10 +20,24 @@
   <services>
     <service>
       <name>SQOOP</name>
-      <version>1.4.6-2.33</version>
+      <version>1.4.6</version>
       <extends>common-services/SQOOP/1.4.4.2.0</extends>
 
-
+      <osSpecifics>
+        <osSpecific>
+          <osFamily>any</osFamily>
+          <packages>
+            <package>
+              <name>sqoop_${stack_version}</name>
+            </package>
+            <package>
+              <name>mysql-connector-java</name>
+              <skipUpgrade>true</skipUpgrade>
+              <condition>should_install_mysl_connector</condition>
+            </package>
+          </packages>
+        </osSpecific>
+      </osSpecifics>
     </service>
   </services>
 </metainfo>
