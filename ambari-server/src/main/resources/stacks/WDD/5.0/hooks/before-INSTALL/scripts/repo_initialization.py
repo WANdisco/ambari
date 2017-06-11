@@ -33,13 +33,13 @@ def _alter_repo(action, repo_string, repo_template):
 
     ubuntu_components = [ repo['repoName'] ] + _UBUNTU_REPO_COMPONENTS_POSTFIX
 
-  Repository(repo['repoId'],
-               action = action,
-               base_url = repo['baseUrl'],
-               mirror_list = repo['mirrorsList'],
-               repo_file_name = repo['repoName'],
-               repo_template = repo_template,
-               components = ubuntu_components, # ubuntu specific
+    Repository(repo['repoId'],
+                 action = action,
+                 base_url = repo['baseUrl'],
+                 mirror_list = repo['mirrorsList'],
+                 repo_file_name = repo['repoName'],
+                 repo_template = repo_template,
+                 components = ubuntu_components, # ubuntu specific
     )
 
 def install_repos():
