@@ -192,7 +192,7 @@ class PSR:
 class Bootstrap(threading.Thread):
   """ Bootstrap the agent on a separate host"""
   SETUP_SCRIPT_FILENAME = "setupAgent.py"
-  AMBARI_REPO_FILENAME = "WDD"
+  AMBARI_REPO_FILENAME = "ambari"
 
   def __init__(self, host, shared_state):
     threading.Thread.__init__(self)
