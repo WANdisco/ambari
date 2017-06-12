@@ -461,7 +461,7 @@ public class RepositoryVersionResourceProvider extends AbstractAuthorizedResourc
     for (RepositoryVersionEntity existingRepoVersion : existingRepoVersions) {
       for (OperatingSystemEntity operatingSystemEntity : existingRepoVersion.getOperatingSystems()) {
         for (RepositoryEntity repositoryEntity : operatingSystemEntity.getRepositories()) {
-          if (! repositoryEntity.getRepositoryId().startsWith("HDP-UTILS") &&  // HDP-UTILS is shared between repo versions
+          if (! repositoryEntity.getRepositoryId().startsWith("WDD-UTILS") &&  // WDD-UTILS is shared between repo versions
                   ! existingRepoVersion.getId().equals(repositoryVersion.getId())) { // Allow modifying already defined repo version
             existingRepoUrls.add(repositoryEntity.getBaseUrl());
           }
