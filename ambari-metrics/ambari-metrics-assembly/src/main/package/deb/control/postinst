@@ -17,15 +17,15 @@
 HADOOP_LINK_NAME="/opt/nsn/ngdb/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar"
 HADOOP_SINK_JAR="/opt/nsn/ngdb/ambari-metrics-hadoop-sink/${hadoop.sink.jar}"
 
-FLUME_LINK_NAME="/opt/nsn/ngdb/flume/lib/ambari-metrics-flume-sink.jar"
-FLUME_SINK_JAR="/opt/nsn/ngdb/flume/lib/${flume.sink.jar}"
+FLUME_LINK_NAME="/opt/nsn/ngdb/ambari-metrics-flume-sink/lib/ambari-metrics-flume-sink.jar"
+FLUME_SINK_JAR="/opt/nsn/ngdb/ambari-metrics-flume-sink/lib/${flume.sink.jar}"
 
 KAFKA_LINK_NAME="/opt/nsn/ngdb/ambari-metrics-kafka-sink/ambari-metrics-kafka-sink.jar"
 KAFKA_SINK_JAR="/opt/nsn/ngdb/ambari-metrics-kafka-sink/${kafka.sink.jar}"
 
 #link for storm jar not required with current loading
-#STORM_SINK_JAR="/opt/nsn/ngdb/storm/lib/${storm.sink.jar}"
-#STORM_LINK_NAME="/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink.jar"
+#STORM_SINK_JAR="/opt/nsn/ngdb/ambari-metrics-storm-sink/lib/s${storm.sink.jar}"
+#STORM_LINK_NAME="/opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar"
 
 JARS=(${HADOOP_SINK_JAR} ${FLUME_SINK_JAR} ${KAFKA_SINK_JAR})
 LINKS=(${HADOOP_LINK_NAME} ${FLUME_LINK_NAME} ${KAFKA_LINK_NAME})

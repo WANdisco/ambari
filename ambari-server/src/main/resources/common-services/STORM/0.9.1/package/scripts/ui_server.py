@@ -91,7 +91,7 @@ class UiServerDefault(UiServer):
     Link(format("{storm_lib_dir}/ambari-metrics-storm-sink.jar"),
          action="delete")
     # On old HDP 2.1 versions, this symlink may also exist and break EU to newer versions
-    Link("/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink.jar", action="delete")
+    Link("/opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar", action="delete")
 
     if check_stack_feature(StackFeature.STORM_METRICS_APACHE_CLASSES, params.version_for_stack_feature_checks):
       sink_jar = params.metric_collector_sink_jar

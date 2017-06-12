@@ -80,15 +80,15 @@ class TestStormNimbus(TestStormBase):
                               owner = 'storm',
                               group = 'hadoop',
                               )
-    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar',
                               action = ['delete'],
                               )
-    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar',
                               action = ['delete'],
                               )
-    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar /opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
-                              not_if = 'ls /opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
-                              only_if = 'ls /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar',
+    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar ambari-metrics-flume-sink-metrics-storm-sink.jar',
+                              not_if = 'ls /opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar',
+                              only_if = 'ls /opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink-legacy-with-common-*.jar',
                               )
     self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; storm nimbus > /var/log/storm/nimbus.out 2>&1 &\n echo $! > /var/run/storm/nimbus.pid',
         path = ['/usr/bin'],
@@ -122,15 +122,15 @@ class TestStormNimbus(TestStormBase):
                               owner = 'storm',
                               group = 'hadoop',
                               )
-    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar',
                               action = ['delete'],
                               )
-    self.assertResourceCalled('Link', '/opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink.jar',
+    self.assertResourceCalled('Link', '/opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar',
                               action = ['delete'],
                               )
-    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-with-common-*.jar /opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
-                              not_if = 'ls /opt/nsn/ngdb/storm/lib//ambari-metrics-storm-sink.jar',
-                              only_if = 'ls /opt/nsn/ngdb/storm/lib/ambari-metrics-storm-sink-with-common-*.jar',
+    self.assertResourceCalled('Execute', 'ambari-sudo.sh ln -s /opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink-with-common-*.jar ambari-metrics-flume-sink-metrics-storm-sink.jar',
+                              not_if = 'ls /opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink.jar',
+                              only_if = 'ls /opt/nsn/ngdb/ambari-metrics-storm-sink/lib/ambari-metrics-storm-sink-with-common-*.jar',
                               )
     self.assertResourceCalled('Execute', 'source /etc/storm/conf/storm-env.sh ; export PATH=$JAVA_HOME/bin:$PATH ; storm nimbus > /var/log/storm/nimbus.out 2>&1 &\n echo $! > /var/run/storm/nimbus.pid',
         path = ['/usr/bin'],
