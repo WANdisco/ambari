@@ -27,7 +27,7 @@
           <osFamily>redhat7,redhat6</osFamily>
           <packages>
             <package>
-              <name>knox</name>
+              <name>knox_${stack_version}</name>
             </package>
           </packages>
         </osSpecific>
