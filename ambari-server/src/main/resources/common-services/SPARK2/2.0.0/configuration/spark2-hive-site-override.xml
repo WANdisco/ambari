@@ -39,6 +39,7 @@ limitations under the License.
     </description>
     <on-ambari-upgrade add="true"/>
   </property>
+  <!-- default property for thrift server port. moved to sprark2-env spark_thrift_cmd_opts and spark2_1_thrift_cmd_opts
   <property>
     <name>hive.server2.thrift.port</name>
     <value>10016</value>
@@ -47,6 +48,7 @@ limitations under the License.
     </description>
     <on-ambari-upgrade add="true"/>
   </property>
+  -->
   <property>
     <name>hive.server2.transport.mode</name>
     <value>binary</value>

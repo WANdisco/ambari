@@ -137,7 +137,16 @@ export JAVA_HOME={{java_home}}
   <property>
     <name>spark_thrift_cmd_opts</name>
     <description>additional spark thrift server commandline options</description>
-    <value/>
+    <value>--hiveconf hive.server2.thrift.port=10016</value>
+    <value-attributes>
+      <empty-value-valid>true</empty-value-valid>
+    </value-attributes>
+    <on-ambari-upgrade add="true"/>
+  </property>
+  <property>
+    <name>spark2_1_thrift_cmd_opts</name>
+    <description>additional spark thrift server commandline options</description>
+    <value>--hiveconf hive.server2.thrift.port=10046</value>
     <value-attributes>
       <empty-value-valid>true</empty-value-valid>
     </value-attributes>

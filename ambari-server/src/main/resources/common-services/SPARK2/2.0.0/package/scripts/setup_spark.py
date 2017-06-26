@@ -97,6 +97,16 @@ def setup_spark(env, type, upgrade_type = None, action = None):
       mode=0644
     )
 
+  if params.has_spark2_1_thriftserver:
+    PropertiesFile(params.spark2_1_thrift_server_conf_file,
+      properties = params.config['configurations']['spark2-1-thrift-sparkconf'],
+      owner = params.hive_user,
+      group = params.user_group,
+      key_value_delimiter = " ",
+      mode=0644
+    )
+
+
   effective_version = params.version if upgrade_type is not None else params.stack_version_formatted
   if effective_version:
     effective_version = format_stack_version(effective_version)

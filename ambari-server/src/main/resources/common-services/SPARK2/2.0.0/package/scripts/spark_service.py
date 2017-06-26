@@ -112,6 +112,28 @@ def spark_service(name, upgrade_type=None, action=None):
       except:
         show_logs(params.spark_log_dir, user=params.hive_user)
         raise
+
+    elif name == 'sparkthriftserver21':
+      if params.security_enabled:
+        hive_principal = params.hive_kerberos_principal
+        hive_kinit_cmd = format("{kinit_path_local} -kt {hive_kerberos_keytab} {hive_principal}; ")
+        Execute(hive_kinit_cmd, user=params.hive_user)
+
+      config = Script.get_config()
+
+      # spark2_1_thrift_port = config['configurations']['spark2-1-hive-site-override']['hive.server2.thrift.port']
+      thriftserver_no_op_test = format(
+        'ls {spark2_1_thrift_server_pid_file} >/dev/null 2>&1 && ps -p `cat {spark2_1_thrift_server_pid_file}` >/dev/null 2>&1')
+      try:
+        Execute(format(
+          '{spark2_1_thrift_server_start} --properties-file {spark2_1_thrift_server_conf_file} {spark2_1_thrift_cmd_opts_properties} '),
+                user=params.hive_user,
+                environment={'JAVA_HOME': params.java_home},
+                not_if=thriftserver_no_op_test
+                )
+      except:
+        show_logs(params.spark_log_dir, user=params.hive_user)
+        raise
   elif action == 'stop':
     if name == 'jobhistoryserver':
       try:
@@ -139,4 +161,16 @@ def spark_service(name, upgrade_type=None, action=None):
         action="delete"
       )
 
+    elif name == 'sparkthriftserver21':
+      try:
+        Execute(format('{spark2_1_thrift_server_stop}'),
+                user=params.hive_user,
+                environment={'JAVA_HOME': params.java_home}
+        )
+      except:
+        show_logs(params.spark_log_dir, user=params.hive_user)
+        raise
+      File(params.spark2_1_thrift_server_pid_file,
+        action="delete"
+      )
 

@@ -63,6 +63,17 @@
               "name": "/HIVE/HIVE_SERVER/hive_server_hive"
             }
           ]
+        },
+        {
+          "name": "SPARK2_1_THRIFTSERVER",
+          "identities": [
+            {
+              "name": "/HDFS/NAMENODE/hdfs"
+            },
+            {
+              "name": "/HIVE/HIVE_SERVER/hive_server_hive"
+            }
+          ]
         }
       ]
     }

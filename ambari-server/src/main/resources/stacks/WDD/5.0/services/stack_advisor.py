@@ -95,31 +95,54 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             "RANGER": self.recommendRangerConfigurations,
             "RANGER_KMS": self.recommendRangerKMSConfigurations,
             "HIVE": self.recommendHiveConfigurations,
+            "SPARK2": self.recommendSpark2Configurations,
             "KNOX": self.recommendKnoxConfigurations,
             "KAFKA": self.recommendKAFKAConfigurations,
         }
 
+    def recommendSpark2Configurations(self, configurations, clusterData, services, hosts):
+        """
+        :type configurations dict
+        :type clusterData dict
+        :type services dict
+        :type hosts dict
+        """
+        putSparkProperty = self.putProperty(configurations, "spark2-defaults", services)
+        putSparkThriftSparkConf = self.putProperty(configurations, "spark2-thrift-sparkconf", services)
+        putSpark2_1ThriftSparkConf = self.putProperty(configurations, "spark2-1-thrift-sparkconf", services)
+
+        spark_queue = self.recommendYarnQueue(services, "spark2-defaults", "spark.yarn.queue")
+        if spark_queue is not None:
+            putSparkProperty("spark.yarn.queue", spark_queue)
+
+        spart_thrift_queue = self.recommendYarnQueue(services, "spark2-thrift-sparkconf", "spark.yarn.queue")
+        if spart_thrift_queue is not None:
+            putSparkThriftSparkConf("spark.yarn.queue", spart_thrift_queue)
+
+        spart_thrift_queue = self.recommendYarnQueue(services, "spark2-1-thrift-sparkconf", "spark.yarn.queue")
+        if spart_thrift_queue is not None:
+            putSpark2_1ThriftSparkConf("spark.yarn.queue", spart_thrift_queue)
+
+        zookeeper_host_port = self.getZKHostPortString(services)
+        if zookeeper_host_port :
+            putSparkThriftSparkConf("spark.deploy.zookeeper.url", zookeeper_host_port)
+            putSpark2_1ThriftSparkConf("spark.deploy.zookeeper.url", spart_thrift_queue)
+
+
     def recommendKnoxConfigurations(self, configurations, clusterData, services, hosts):
-        if "ranger-env" in services["configurations"] and "ranger-knox-plugin-properties" in services[
-            "configurations"] and \
+        if "ranger-env" in services["configurations"] and "ranger-knox-plugin-properties" in services["configurations"] and \
                         "ranger-knox-plugin-enabled" in services["configurations"]["ranger-env"]["properties"]:
             putKnoxRangerPluginProperty = self.putProperty(configurations, "ranger-knox-plugin-properties", services)
-            rangerEnvKnoxPluginProperty = services["configurations"]["ranger-env"]["properties"][
-                "ranger-knox-plugin-enabled"]
+            rangerEnvKnoxPluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-knox-plugin-enabled"]
             putKnoxRangerPluginProperty("ranger-knox-plugin-enabled", rangerEnvKnoxPluginProperty)
 
-        if 'topology' in services["configurations"] and 'content' in services["configurations"]["topology"][
-            "properties"]:
+        if 'topology' in services["configurations"] and 'content' in services["configurations"]["topology"]["properties"]:
             putKnoxTopologyContent = self.putProperty(configurations, "topology", services)
             rangerPluginEnabled = ''
-            if 'ranger-knox-plugin-properties' in configurations and 'ranger-knox-plugin-enabled' in \
-                    configurations['ranger-knox-plugin-properties']['properties']:
-                rangerPluginEnabled = configurations['ranger-knox-plugin-properties']['properties'][
-                    'ranger-knox-plugin-enabled']
-            elif 'ranger-knox-plugin-properties' in services['configurations'] and 'ranger-knox-plugin-enabled' in \
-                    services['configurations']['ranger-knox-plugin-properties']['properties']:
-                rangerPluginEnabled = services['configurations']['ranger-knox-plugin-properties']['properties'][
-                    'ranger-knox-plugin-enabled']
+            if 'ranger-knox-plugin-properties' in configurations and 'ranger-knox-plugin-enabled' in configurations['ranger-knox-plugin-properties']['properties']:
+                rangerPluginEnabled = configurations['ranger-knox-plugin-properties']['properties']['ranger-knox-plugin-enabled']
+            elif 'ranger-knox-plugin-properties' in services['configurations'] and 'ranger-knox-plugin-enabled' in services['configurations']['ranger-knox-plugin-properties']['properties']:
+                rangerPluginEnabled = services['configurations']['ranger-knox-plugin-properties']['properties']['ranger-knox-plugin-enabled']
 
             # check if authorization provider already added
             topologyContent = services["configurations"]["topology"]["properties"]["content"]
@@ -135,8 +158,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                             authorizationProviderExists = True
 
                         name = provider.find('name')
-                        if name is not None and name.text == "AclsAuthz" and rangerPluginEnabled \
-                                and rangerPluginEnabled.lower() == "Yes".lower():
+                        if name is not None and name.text == "AclsAuthz" and rangerPluginEnabled and rangerPluginEnabled.lower() == "Yes".lower():
                             newAuthName = "XASecurePDPKnox"
                             authNameChanged = True
                         elif name is not None and (
@@ -2098,6 +2120,9 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                                "ams-hbase-env": self.validateAmsHbaseEnvConfigurations,
                                "ams-site": self.validateAmsSiteConfigurations,
                                "ams-env": self.validateAmsEnvConfigurations},
+            "SPARK2": {"spark2-defaults": self.validateSpark2Defaults,
+                       "spark2-thrift-sparkconf": self.validateSpark2ThriftSparkConf,
+                       "spark2-1-thrift-sparkconf": self.validateSpark2_1ThriftSparkConf},
             "KNOX": {"ranger-knox-plugin-properties": self.validateKnoxRangerPluginConfigurations},
             "KAKFA": {"kafka-broker": self.validateKAFKAConfigurations}
         }
@@ -2649,6 +2674,33 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             if yarnAppMapreduceAmCommandOpts > yarnAppMapreduceAmResourceMb: validationItems.append({"config-name": 'yarn.app.mapreduce.am.command-opts', "item": self.getWarnItem("yarn.app.mapreduce.am.command-opts Xmx should be less than yarn.app.mapreduce.am.resource.mb ({0})".format(yarnAppMapreduceAmResourceMb))})
 
         return self.toConfigurationValidationProblems(validationItems, "mapred-site")
+
+    def validateSpark2Defaults(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = [
+            {
+                "config-name": 'spark.yarn.queue',
+                "item": self.validatorYarnQueue(properties, recommendedDefaults, 'spark.yarn.queue', services)
+            }
+        ]
+        return self.toConfigurationValidationProblems(validationItems, "spark2-defaults")
+
+    def validateSpark2ThriftSparkConf(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = [
+            {
+                "config-name": 'spark.yarn.queue',
+                "item": self.validatorYarnQueue(properties, recommendedDefaults, 'spark.yarn.queue', services)
+            }
+        ]
+        return self.toConfigurationValidationProblems(validationItems, "spark2-thrift-sparkconf")
+
+    def validateSpark2_1ThriftSparkConf(self, properties, recommendedDefaults, configurations, services, hosts):
+        validationItems = [
+            {
+                "config-name": 'spark.yarn.queue',
+                "item": self.validatorYarnQueue(properties, recommendedDefaults, 'spark.yarn.queue', services)
+            }
+        ]
+        return self.toConfigurationValidationProblems(validationItems, "spark2-1-thrift-sparkconf")
 
     def validateYARNConfigurations(self, properties, recommendedDefaults, configurations, services, hosts):
         clusterEnv = getSiteProperties(configurations, "cluster-env")
