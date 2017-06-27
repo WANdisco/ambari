@@ -32,34 +32,6 @@ def link_config_scripts():
             not_if='ls {0}'.format(system_script_path)
         )
 
-def find_hadoop_mapreduce_examples(hadoop_dir):
-    mapreduce_dir = hadoop_dir + "/share/hadoop/mapreduce/"
-    if os.path.isdir(mapreduce_dir):
-        for file in os.listdir(mapreduce_dir):
-            if fnmatch.fnmatch(file, 'hadoop-mapreduce-examples-2.*.jar'):
-                return os.path.join(mapreduce_dir, file)
-    return None
-
-def patch_hadoop_config():
-    hadoop_dir = os.path.join(nsn_distro_root, "hadoop")
-    hadoop_libexec = os.path.join(hadoop_dir, "libexec")
-    if os.path.isdir(hadoop_libexec):
-        File(os.path.join(hadoop_libexec, "hadoop-config.sh"),
-             content=StaticFile('hadoop-config.sh'),
-             mode=0755)
-
-    if os.path.exists(hadoop_dir):
-        hadoop_yarn_apps_distributedshell = os.path.join(hadoop_dir, "hadoop-yarn-applications-distributedshell.jar")
-        if not os.path.exists(hadoop_yarn_apps_distributedshell):
-            File(hadoop_yarn_apps_distributedshell,
-                 content=StaticFile('hadoop-yarn-applications-distributedshell.jar'),
-                 mode=0755)
-
-        hadoop_mapreduce_examples_jar = find_hadoop_mapreduce_examples(hadoop_dir)
-        if hadoop_mapreduce_examples_jar is not None:
-            File(os.path.join(hadoop_dir, "hadoop-mapreduce-examples-2.7.3.jar"),
-                 content=StaticFile(hadoop_mapreduce_examples_jar))
-
 
 def setup_user_environment():
     Link("/usr/bin/hdfs",
@@ -110,7 +82,6 @@ class AfterInstallHook(Hook):
         wdd_stack.setup()
         setup_stack_log_dirs()
         link_config_scripts()
-        patch_hadoop_config()
         create_spark_tmp_dir()
         build_framework_tarballs(Script.get_config())
 
