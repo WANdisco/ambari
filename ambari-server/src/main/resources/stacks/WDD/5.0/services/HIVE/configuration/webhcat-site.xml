@@ -34,13 +34,13 @@ limitations under the License.
   </property>
   <property>
     <name>templeton.jar</name>
-    <value>/usr/wdd/current/hive-server2/hcatalog/share/webhcat/svr/lib/hive-webhcat-2.1.1.jar</value>
+    <value>/usr/wdd/current/hive-server2/hcatalog/share/webhcat/svr/lib/hive-webhcat.jar</value>
     <description>The path to the Templeton jar file.</description>
     <on-ambari-upgrade add="true"/>
   </property>
   <property>
     <name>templeton.libjars</name>
-    <value>/usr/wdd/current/zookeeper-client/zookeeper-3.4.6.jar</value>
+    <value>/usr/wdd/current/zookeeper-client/zookeeper.jar</value>
     <description>Jars to add the the classpath.</description>
     <on-ambari-upgrade add="true"/>
   </property>
