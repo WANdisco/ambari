@@ -70,11 +70,10 @@ class SparkThriftServer(Script):
     import params
 
     env.set_params(params)
-    if params.version and check_stack_feature(StackFeature.SPARK2_THRIFTSERVER, params.version):
-      Logger.info("Executing Spark2-1 Thrift Server Stack Upgrade pre-restart")
-      conf_select.select(params.stack_name, "spark2", params.version)
-      stack_select.select("spark2-1-thriftserver", params.version)
-      
+    Logger.info("Executing Spark2-1 Thrift Server Stack Upgrade pre-restart")
+    conf_select.select(params.stack_name, "spark2", params.version)
+    stack_select.select("spark2-1-thriftserver", params.version)
+
   def get_log_folder(self):
     import params
     return params.spark_log_dir
