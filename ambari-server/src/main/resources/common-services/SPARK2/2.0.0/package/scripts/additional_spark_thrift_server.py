@@ -64,15 +64,15 @@ class SparkThriftServer(Script):
     check_process_status(status_params.spark2_1_thrift_server_pid_file)
 
   def get_component_name(self):
-    return "spark2-1-thriftserver"
+    return "spark2_1-thriftserver"
 
   def pre_upgrade_restart(self, env, upgrade_type=None):
     import params
 
     env.set_params(params)
-    Logger.info("Executing Spark2-1 Thrift Server Stack Upgrade pre-restart")
+    Logger.info("Executing Spark2 Secondary Thrift Server Stack Upgrade pre-restart")
     conf_select.select(params.stack_name, "spark2", params.version)
-    stack_select.select("spark2-1-thriftserver", params.version)
+    stack_select.select("spark2_1-thriftserver", params.version)
 
   def get_log_folder(self):
     import params

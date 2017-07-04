@@ -116,7 +116,7 @@
         </component>
         <component>
           <name>SPARK2_1_THRIFTSERVER</name>
-          <displayName>Spark2-1 Thrift Server</displayName>
+          <displayName>Spark2 Secondary Thrift Server</displayName>
           <category>SLAVE</category>
           <cardinality>0+</cardinality>
           <versionAdvertised>true</versionAdvertised>
