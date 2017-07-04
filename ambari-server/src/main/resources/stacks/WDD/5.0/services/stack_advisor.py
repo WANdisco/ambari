@@ -115,18 +115,18 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         if spark_queue is not None:
             putSparkProperty("spark.yarn.queue", spark_queue)
 
-        spart_thrift_queue = self.recommendYarnQueue(services, "spark2-thrift-sparkconf", "spark.yarn.queue")
-        if spart_thrift_queue is not None:
-            putSparkThriftSparkConf("spark.yarn.queue", spart_thrift_queue)
+        spark_thrift_queue = self.recommendYarnQueue(services, "spark2-thrift-sparkconf", "spark.yarn.queue")
+        if spark_thrift_queue is not None:
+            putSparkThriftSparkConf("spark.yarn.queue", spark_thrift_queue)
 
-        spart_thrift_queue = self.recommendYarnQueue(services, "spark2-1-thrift-sparkconf", "spark.yarn.queue")
-        if spart_thrift_queue is not None:
-            putSpark2_1ThriftSparkConf("spark.yarn.queue", spart_thrift_queue)
+        spark_thrift_queue = self.recommendYarnQueue(services, "spark2-1-thrift-sparkconf", "spark.yarn.queue")
+        if spark_thrift_queue is not None:
+            putSpark2_1ThriftSparkConf("spark.yarn.queue", spark_thrift_queue)
 
         zookeeper_host_port = self.getZKHostPortString(services)
         if zookeeper_host_port :
             putSparkThriftSparkConf("spark.deploy.zookeeper.url", zookeeper_host_port)
-            putSpark2_1ThriftSparkConf("spark.deploy.zookeeper.url", spart_thrift_queue)
+            putSpark2_1ThriftSparkConf("spark.deploy.zookeeper.url", zookeeper_host_port)
 
 
     def recommendKnoxConfigurations(self, configurations, clusterData, services, hosts):
@@ -1495,6 +1495,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                         services["configurations"]["hive-site"]["properties"]):
                 putHiveSitePropertyAttribute("hive.server2.authentication.ldap.url", "delete", "true")
 
+        Logger.info("SVA DEBUG: hive_server2_auth = {0} going to kerberos".format(hive_server2_auth))
         if hive_server2_auth == "kerberos":
             if "hive-site" in services["configurations"] and "hive.server2.authentication.kerberos.keytab" not in services["configurations"]["hive-site"]["properties"]:
                 putHiveSiteProperty("hive.server2.authentication.kerberos.keytab", "")

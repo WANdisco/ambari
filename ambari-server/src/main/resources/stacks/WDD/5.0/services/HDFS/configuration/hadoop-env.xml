@@ -366,6 +366,8 @@ if [ -d "/usr/wdd/current/tez-client" ]; then
   export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:/usr/wdd/current/tez-client/*:/usr/wdd/current/tez-client/lib/*:/usr/wdd/current/tez-client/conf
 fi
 
+export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:/usr/wdd/current/spark2-client/aux/*
+
 # Setting path to hdfs command line
 export HADOOP_LIBEXEC_DIR={{hadoop_libexec_dir}}
 
