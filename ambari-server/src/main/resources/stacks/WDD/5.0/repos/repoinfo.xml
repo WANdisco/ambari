@@ -20,12 +20,12 @@
   <os family="redhat6">
     <package-version>5_0_0_0_*</package-version>
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
-      <repoid>WDD-5.0.0.0</repoid>
+      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+      <repoid>WDD</repoid>
       <reponame>WDD</reponame>
     </repo>
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd-utils</baseurl>
+      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd-utils</baseurl>
       <repoid>WDD-UTILS</repoid>
       <reponame>WDD-UTILS</reponame>
     </repo>
@@ -33,12 +33,12 @@
   <os family="redhat7">
     <package-version>5_0_0_0_*</package-version>
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
-      <repoid>WDD-5.0.0.0</repoid>
+      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+      <repoid>WDD</repoid>
       <reponame>WDD</reponame>
     </repo>
     <repo>
-      <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd-utils</baseurl>
+      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd-utils</baseurl>
       <repoid>WDD-UTILS</repoid>
       <reponame>WDD-UTILS</reponame>
     </repo>
