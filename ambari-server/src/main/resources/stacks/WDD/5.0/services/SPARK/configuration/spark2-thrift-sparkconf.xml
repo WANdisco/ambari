@@ -166,16 +166,4 @@
       <overridable>false</overridable>
     </value-attributes>
   </property>
-  <property>
-    <name>spark.deploy.zookeeper.url</name>
-    <value>{{zookeeper_quorum}}</value>
-    <description>When `spark.deploy.recoveryMode` is set to ZOOKEEPER, this configuration is used to set the zookeeper URL to connect to.</description>
-    <on-ambari-upgrade add="true"/>
-  </property>
-  <property>
-    <name>spark.deploy.recoveryMode</name>
-    <value>ZOOKEEPER</value>
-    <description>The recovery mode setting to recover submitted Spark jobs with cluster mode when it failed and relaunches. This is only applicable for cluster mode when running with Standalone or Mesos.</description>
-    <on-ambari-upgrade add="true"/>
-  </property>
 </configuration>

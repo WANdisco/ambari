@@ -76,6 +76,24 @@ spark_thrift_server_conf_file = spark_conf + "/spark-thrift-sparkconf.conf"
 spark2_1_thrift_server_conf_file = spark_conf + "/spark2_1-thrift-sparkconf.conf"
 java_home = config['hostLevelParams']['java_home']
 
+# zookeeper
+zookeeper_hosts = config['clusterHostInfo']['zookeeper_hosts']
+zookeeper_port = default('/configurations/zoo.cfg/clientPort', None)
+
+# get comma separated lists of zookeeper hosts from clusterHostInfo
+index = 0
+zookeeper_quorum = ""
+for host in zookeeper_hosts:
+  zookeeper_host = host
+  if zookeeper_port is not None:
+    zookeeper_host = host + ":" + str(zookeeper_port)
+
+  zookeeper_quorum += zookeeper_host
+  index += 1
+  if index < len(zookeeper_hosts):
+    zookeeper_quorum += ","
+
+
 hdfs_user = config['configurations']['hadoop-env']['hdfs_user']
 hdfs_principal_name = config['configurations']['hadoop-env']['hdfs_principal_name']
 hdfs_user_keytab = config['configurations']['hadoop-env']['hdfs_user_keytab']

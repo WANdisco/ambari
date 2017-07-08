@@ -108,6 +108,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         :type hosts dict
         """
         putSparkProperty = self.putProperty(configurations, "spark2-defaults", services)
+        putSparkHiveSiteOverride = self.putProperty(configurations, "spark2-hive-site-override", services)
         putSparkThriftSparkConf = self.putProperty(configurations, "spark2-thrift-sparkconf", services)
         putSpark2_1ThriftSparkConf = self.putProperty(configurations, "spark2-1-thrift-sparkconf", services)
 
@@ -125,8 +126,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
         zookeeper_host_port = self.getZKHostPortString(services)
         if zookeeper_host_port :
-            putSparkThriftSparkConf("spark.deploy.zookeeper.url", zookeeper_host_port)
-            putSpark2_1ThriftSparkConf("spark.deploy.zookeeper.url", zookeeper_host_port)
+            putSparkHiveSiteOverride("hive.zookeeper.quorum", zookeeper_host_port)
 
 
     def recommendKnoxConfigurations(self, configurations, clusterData, services, hosts):
