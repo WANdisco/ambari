@@ -18,9 +18,9 @@
 <reposinfo>
   <latest>/var/lib/ambari-server/resources/stacks/WDD/5.0/wdd.latest.json</latest>
   <os family="redhat6">
-    <package-version>5_0_0_0_*</package-version>
+    <package-version>5_0_0_2_*</package-version>
     <repo>
-      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.2</baseurl>
       <repoid>WDD</repoid>
       <reponame>WDD</reponame>
     </repo>
@@ -31,9 +31,9 @@
     </repo>
   </os>
   <os family="redhat7">
-    <package-version>5_0_0_0_*</package-version>
+    <package-version>5_0_0_2_*</package-version>
     <repo>
-      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+      <baseurl>https://internal-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.2</baseurl>
       <repoid>WDD</repoid>
       <reponame>WDD</reponame>
     </repo>

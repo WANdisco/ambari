@@ -3,7 +3,7 @@
   <release>
     <type>STANDARD</type>
     <stack-id>WDD-5.0</stack-id>
-    <version>5.0.0.0</version>
+    <version>5.0.0.2</version>
     <build>1</build>
     <compatible-with>5.0</compatible-with>
     <release-notes>http://example.com</release-notes>
@@ -27,9 +27,9 @@
   <available-services/>
   <repository-info>
     <os family="redhat6">
-      <package-version>5_0_0_0_*</package-version>
+      <package-version>5_0_0_2_*</package-version>
       <repo>
-        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.2</baseurl>
         <repoid>WDD</repoid>
         <reponame>WDD</reponame>
       </repo>
@@ -40,9 +40,9 @@
       </repo>
     </os>
     <os family="redhat7">
-      <package-version>5_0_0_0_*</package-version>
+      <package-version>5_0_0_2_*</package-version>
       <repo>
-        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.0</baseurl>
+        <baseurl>https://public-repo.wandisco.com/nexus/content/repositories/wdd5.0.0.2</baseurl>
         <repoid>WDD</repoid>
         <reponame>WDD</reponame>
       </repo>
