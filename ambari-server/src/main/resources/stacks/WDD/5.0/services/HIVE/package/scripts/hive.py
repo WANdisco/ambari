@@ -107,10 +107,6 @@ def hive(name=None):
 def hive(name=None):
   import params
 
-  File(os.path.join(params.hive_home_dir, "bin", "hive"),
-       mode=0755,
-       content=StaticFile('hive.sh')
-       )
   if name == 'hiveserver2':
     # copy tarball to HDFS feature not supported
     if not (params.stack_version_formatted_major and check_stack_feature(StackFeature.COPY_TARBALL_TO_HDFS, params.stack_version_formatted_major)):  
