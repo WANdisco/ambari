@@ -916,6 +916,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
 
         # recommendations for HBase site config
         putHbaseSiteProperty = self.putProperty(configurations, "hbase-site", services)
+        putHbaseSitePropertyAttributes = self.putPropertyAttribute(configurations, "hbase-site")
 
         if 'hbase-site' in services['configurations'] and 'hbase.superuser' in services['configurations']['hbase-site']['properties'] \
                 and 'hbase-env' in services['configurations'] and 'hbase_user' in services['configurations']['hbase-env']['properties'] \
@@ -927,13 +928,11 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             putHbaseRangerPluginProperty = self.putProperty(configurations, "ranger-hbase-plugin-properties", services)
             rangerEnvHbasePluginProperty = services["configurations"]["ranger-env"]["properties"]["ranger-hbase-plugin-enabled"]
             putHbaseRangerPluginProperty("ranger-hbase-plugin-enabled", rangerEnvHbasePluginProperty)
-            if "cluster-env" in services["configurations"] and "smokeuser" in services["configurations"]["cluster-env"][
-                "properties"]:
+            if "cluster-env" in services["configurations"] and "smokeuser" in services["configurations"]["cluster-env"]["properties"]:
                 smoke_user = services["configurations"]["cluster-env"]["properties"]["smokeuser"]
                 putHbaseRangerPluginProperty("policy_user", smoke_user)
         rangerPluginEnabled = ''
-        if 'ranger-hbase-plugin-properties' in configurations and 'ranger-hbase-plugin-enabled' in \
-                configurations['ranger-hbase-plugin-properties']['properties']:
+        if 'ranger-hbase-plugin-properties' in configurations and 'ranger-hbase-plugin-enabled' in configurations['ranger-hbase-plugin-properties']['properties']:
             rangerPluginEnabled = configurations['ranger-hbase-plugin-properties']['properties']['ranger-hbase-plugin-enabled']
         elif 'ranger-hbase-plugin-properties' in services['configurations'] and 'ranger-hbase-plugin-enabled' in \
                 services['configurations']['ranger-hbase-plugin-properties']['properties']:
@@ -949,6 +948,69 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
             'hbase.coprocessor.master.classes': []
         }
 
+        for key in hbaseCoProcessorConfigs:
+            hbase_coprocessor_classes = None
+            if key in configurations["hbase-site"]["properties"]:
+                hbase_coprocessor_classes = configurations["hbase-site"]["properties"][key].strip()
+            elif 'hbase-site' in services['configurations'] and key in services['configurations']["hbase-site"]["properties"]:
+                hbase_coprocessor_classes = services['configurations']["hbase-site"]["properties"][key].strip()
+            if hbase_coprocessor_classes:
+                hbaseCoProcessorConfigs[key] = hbase_coprocessor_classes.split(',')
+
+        # If configurations has it - it has priority as it is calculated. Then, the service's configurations will be used.
+        hbase_security_authorization = None
+        if 'hbase-site' in configurations and 'hbase.security.authorization' in configurations['hbase-site']['properties']:
+            hbase_security_authorization = configurations['hbase-site']['properties']['hbase.security.authorization']
+        elif 'hbase-site' in services['configurations'] and 'hbase.security.authorization' in services['configurations']['hbase-site']['properties']:
+            hbase_security_authorization = services['configurations']['hbase-site']['properties']['hbase.security.authorization']
+        if hbase_security_authorization:
+            if 'true' == hbase_security_authorization.lower():
+                hbaseCoProcessorConfigs['hbase.coprocessor.master.classes'].append('org.apache.hadoop.hbase.security.access.AccessController')
+                hbaseCoProcessorConfigs['hbase.coprocessor.regionserver.classes'].append('org.apache.hadoop.hbase.security.access.AccessController')
+                # regional classes when hbase authorization is enabled
+                authRegionClasses = ['org.apache.hadoop.hbase.security.access.SecureBulkLoadEndpoint',
+                                     'org.apache.hadoop.hbase.security.access.AccessController']
+                for item in range(len(authRegionClasses)):
+                    hbaseCoProcessorConfigs['hbase.coprocessor.region.classes'].append(authRegionClasses[item])
+            else:
+                if 'org.apache.hadoop.hbase.security.access.AccessController' in hbaseCoProcessorConfigs['hbase.coprocessor.region.classes']:
+                    hbaseCoProcessorConfigs['hbase.coprocessor.region.classes'].remove('org.apache.hadoop.hbase.security.access.AccessController')
+                if 'org.apache.hadoop.hbase.security.access.AccessController' in hbaseCoProcessorConfigs['hbase.coprocessor.master.classes']:
+                    hbaseCoProcessorConfigs['hbase.coprocessor.master.classes'].remove('org.apache.hadoop.hbase.security.access.AccessController')
+
+                hbaseCoProcessorConfigs['hbase.coprocessor.region.classes'].append("org.apache.hadoop.hbase.security.access.SecureBulkLoadEndpoint")
+                if ('hbase.coprocessor.regionserver.classes' in configurations["hbase-site"]["properties"]) or \
+                        ('hbase-site' in services['configurations'] and 'hbase.coprocessor.regionserver.classes' in
+                            services['configurations']["hbase-site"]["properties"]):
+                    putHbaseSitePropertyAttributes('hbase.coprocessor.regionserver.classes', 'delete', 'true')
+        else:
+            hbaseCoProcessorConfigs['hbase.coprocessor.region.classes'].append("org.apache.hadoop.hbase.security.access.SecureBulkLoadEndpoint")
+            if ('hbase.coprocessor.regionserver.classes' in configurations["hbase-site"]["properties"]) or \
+                    ('hbase-site' in services['configurations'] and 'hbase.coprocessor.regionserver.classes' in
+                        services['configurations']["hbase-site"]["properties"]):
+                putHbaseSitePropertyAttributes('hbase.coprocessor.regionserver.classes', 'delete', 'true')
+
+        # Authentication
+        if 'hbase-site' in services['configurations'] and 'hbase.security.authentication' in services['configurations']['hbase-site']['properties']:
+            if 'kerberos' == services['configurations']['hbase-site']['properties']['hbase.security.authentication'].lower():
+                if 'org.apache.hadoop.hbase.security.access.SecureBulkLoadEndpoint' not in hbaseCoProcessorConfigs['hbase.coprocessor.region.classes']:
+                    hbaseCoProcessorConfigs['hbase.coprocessor.region.classes'].append('org.apache.hadoop.hbase.security.access.SecureBulkLoadEndpoint')
+                if 'org.apache.hadoop.hbase.security.token.TokenProvider' not in hbaseCoProcessorConfigs['hbase.coprocessor.region.classes']:
+                    hbaseCoProcessorConfigs['hbase.coprocessor.region.classes'].append('org.apache.hadoop.hbase.security.token.TokenProvider')
+            else:
+                if 'org.apache.hadoop.hbase.security.token.TokenProvider' in hbaseCoProcessorConfigs['hbase.coprocessor.region.classes']:
+                    hbaseCoProcessorConfigs['hbase.coprocessor.region.classes'].remove('org.apache.hadoop.hbase.security.token.TokenProvider')
+
+        # Remove duplicates
+        for key in hbaseCoProcessorConfigs:
+            uniqueCoprocessorRegionClassList = []
+            [uniqueCoprocessorRegionClassList.append(i)
+             for i in hbaseCoProcessorConfigs[key] if
+             not i in uniqueCoprocessorRegionClassList
+             and (i.strip() not in ['{{hbase_coprocessor_region_classes}}', '{{hbase_coprocessor_master_classes}}',
+                                    '{{hbase_coprocessor_regionserver_classes}}'])]
+            putHbaseSiteProperty(key, ','.join(set(uniqueCoprocessorRegionClassList)))
+
         servicesList = [service["StackServices"]["service_name"] for service in services["services"]]
         rangerServiceVersion = ''
         if 'RANGER' in servicesList:
@@ -963,8 +1025,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
         for item in range(len(hbaseClassConfigs)):
             if 'hbase-site' in services['configurations']:
                 if hbaseClassConfigs[item] in services['configurations']['hbase-site']['properties']:
-                    if 'hbase-site' in configurations and hbaseClassConfigs[item] in configurations['hbase-site'][
-                        'properties']:
+                    if 'hbase-site' in configurations and hbaseClassConfigs[item] in configurations['hbase-site']['properties']:
                         coprocessorConfig = configurations['hbase-site']['properties'][hbaseClassConfigs[item]]
                     else:
                         coprocessorConfig = services['configurations']['hbase-site']['properties'][hbaseClassConfigs[item]]
@@ -984,6 +1045,7 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                             putHbaseSiteProperty(hbaseClassConfigs[item], ','.join(coprocessorClasses))
                 elif rangerPluginEnabled and rangerPluginEnabled.lower() == 'Yes'.lower():
                     putHbaseSiteProperty(hbaseClassConfigs[item], rangerClass)
+
 
     def recommendRangerConfigurations(self, configurations, clusterData, services, hosts):
 
@@ -2928,6 +2990,19 @@ class WDD50StackAdvisor(DefaultStackAdvisor):
                 validationItems.append({"config-name": prop_name,
                                         "item": self.getWarnItem("If Ranger HBase Plugin is enabled." \
                                             " {0} needs to contain {1} instead of {2}".format(prop_name, prop_val, exclude_val))})
+
+        # Validate hbase.security.authentication.
+        # Kerberos works only when security enabled.
+        if "hbase.security.authentication" in properties:
+            hbase_security_kerberos = properties["hbase.security.authentication"].lower() == "kerberos"
+            core_site_properties = getSiteProperties(configurations, "core-site")
+            security_enabled = False
+            if core_site_properties:
+                security_enabled = core_site_properties['hadoop.security.authentication'] == 'kerberos' and \
+                                   core_site_properties['hadoop.security.authorization'] == 'true'
+            if not security_enabled and hbase_security_kerberos:
+                validationItems.append({"config-name": "hbase.security.authentication",
+                                        "item": self.getWarnItem("Cluster must be secured with Kerberos before hbase.security.authentication's value of kerberos will have effect")})
 
         return self.toConfigurationValidationProblems(validationItems, "hbase-env")
 
